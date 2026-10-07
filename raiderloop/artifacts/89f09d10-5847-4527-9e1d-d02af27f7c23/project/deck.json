@@ -1,0 +1,17 @@
+{
+  "v": 4,
+  "createdOnFiles": {"v": 1, "at": "2026-09-17T23:58:00Z"},
+  "title": "RaiderLoop — TTU IT Overview",
+  "order": ["cover", "problem", "solution", "screen_home", "screen_map", "screen_dining", "screen_askred", "architecture", "why_this_works", "roadmap", "ask"],
+  "sections": {
+    "s1": {"description": "The problem: system fragmentation across campus", "start": "problem"},
+    "s2": {"description": "What RaiderLoop is, in real numbers", "start": "solution"},
+    "s3": {"description": "The app itself, screen by screen", "start": "screen_home"},
+    "s4": {"description": "How it's built, and why the past blocker doesn't apply", "start": "architecture"},
+    "s5": {"description": "Honest roadmap and the ask", "start": "roadmap"}
+  },
+  "faces": {
+    "manrope": {"family": "Manrope", "href": "https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&display=swap"}
+  },
+  "designSystems": []
+}

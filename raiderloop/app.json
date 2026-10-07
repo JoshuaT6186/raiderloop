@@ -1,34 +1,67 @@
 {
   "expo": {
-    "name": "raiderloop",
-    "slug": "raiderloop",
-    "version": "1.0.0",
+    "name": "Flyer",
+    "slug": "flyer",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
+    "scheme": "flyer",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FBF7EC",
+      "dark": { "image": "./assets/splash-icon.png", "backgroundColor": "#1E2A25" }
+    },
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.joshuat8808.raiderloop",
+      "supportsTablet": false,
+      "bundleIdentifier": "com.joshuat8808.flyer",
+      "usesAppleSignIn": true,
+      "entitlements": {
+        "com.apple.security.application-groups": ["group.com.joshuat8808.flyer"]
+      },
       "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Flyer reads a screenshot of your class schedule so it can add your classes for you. You choose the image; nothing else in your library is accessed.",
+        "NSLocationWhenInUseUsageDescription": "Flyer uses your location while the app is open to sort nearby places by walking time, and — only if you turn it on — to share where you are with friends you choose.",
+        "NSCalendarsUsageDescription": "Flyer adds your classes and due dates to a separate Flyer calendar when you tap Export.",
+        "NSCalendarsFullAccessUsageDescription": "Flyer adds your classes and due dates to a separate Flyer calendar when you tap Export, and replaces them when you export again.",
+        "NSUserTrackingUsageDescription": "This lets ads in Flyer be more relevant. Saying no is fine — you'll still see ads, just less relevant ones. Your schedule, location, and friends are never shared with advertisers.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
+      "package": "com.joshuat8808.flyer",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#2F5DA8"
       },
-      "predictiveBackGestureEnabled": false
+      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION", "READ_CALENDAR", "WRITE_CALENDAR"],
+      "blockedPermissions": ["ACCESS_BACKGROUND_LOCATION"]
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
+    "web": { "favicon": "./assets/favicon.png" },
+    "plugins": [
+      "expo-font",
+      "expo-web-browser",
+      "expo-apple-authentication",
+      ["expo-notifications", { "color": "#2F5DA8" }],
+      ["expo-location", {
+        "locationWhenInUsePermission": "Flyer uses your location while the app is open to sort nearby places by walking time, and — only if you turn it on — to share where you are with friends you choose.",
+        "isIosBackgroundLocationEnabled": false,
+        "isAndroidBackgroundLocationEnabled": false
+      }],
+      ["expo-calendar", { "calendarPermission": "Flyer adds your classes and due dates to a separate Flyer calendar when you tap Export." }],
+      ["expo-image-picker", { "photosPermission": "Flyer reads a screenshot of your class schedule so it can add your classes for you.", "cameraPermission": false }],
+      ["expo-tracking-transparency", { "userTrackingPermission": "This lets ads in Flyer be more relevant. Saying no is fine — you'll still see ads, just less relevant ones. Your schedule, location, and friends are never shared with advertisers." }],
+      ["react-native-google-mobile-ads", {
+        "iosAppId": "ca-app-pub-3940256099942544~1458002511",
+        "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+        "userTrackingUsageDescription": "This lets ads in Flyer be more relevant. Saying no is fine — you'll still see ads, just less relevant ones."
+      }],
+      "@bacons/apple-targets"
+    ],
     "extra": {
-      "eas": {
-        "projectId": "92a4dc62-69f4-4fff-90c5-0ccb806c8ba5"
-      }
+      "eas": { "projectId": "REPLACE_WITH_NEW_EAS_PROJECT_ID" }
     }
   }
 }

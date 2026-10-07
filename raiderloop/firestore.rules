@@ -1,0 +1,36 @@
+rules_version = '2';
+// Flyer Firestore rules.
+// Clients can READ only what they need for live screens; every write
+// goes through Cloud Functions, which enforce the social rules.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // My own profile (handle, plus, canvasConnected).
+    match /users/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+
+      // My friends list, incoming requests, and block list — mine only.
+      match /friends/{other} { allow read: if request.auth != null && request.auth.uid == uid; allow write: if false; }
+      match /requests/{other} { allow read: if request.auth != null && request.auth.uid == uid; allow write: if false; }
+      match /blocked/{other} { allow read: if request.auth != null && request.auth.uid == uid; allow write: if false; }
+    }
+
+    // A location doc is readable only by its owner and the friends
+    // the owner chose. Removing someone from `allowed` cuts access
+    // immediately. Expired shares are deleted every 10 minutes by the
+    // cleanupExpiredLocations function and hidden by the app sooner.
+    match /locations/{uid} {
+      allow read: if request.auth != null && (
+        request.auth.uid == uid || request.auth.uid in resource.data.allowed
+      );
+      allow write: if false;
+    }
+
+    // Everything else is server-only: cache, usage counters, tokens,
+    // classmates index, handles, school requests, sponsors.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
