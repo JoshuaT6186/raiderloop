@@ -6,7 +6,7 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~57.0.18",
     "expo-blur": "~57.0.2",
-    "expo-image-picker": "~57.0.15",
+    "expo-image-picker": "~57.0.16",
     "expo-status-bar": "~57.0.1",
     "firebase": "^12.18.0",
     "react": "19.2.3",
