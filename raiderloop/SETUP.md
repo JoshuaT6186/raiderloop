@@ -6,14 +6,27 @@ Flyer replaces RaiderLoop. It's a multi-file Expo project now, so instead of pas
 
 In your Codespace, from the root of your existing Expo project:
 
+Drag `flyer.zip` into the root of your repo (the folder with `package.json`), open a terminal there, and run:
+
 ```bash
-# keep your package.json, node_modules and .git — replace the app code
+# 1. restore point, so nothing is ever lost
+git add -A && git commit -m "Before Flyer" || true
+
+# 2. unzip into a temp folder
+unzip -o flyer.zip -d _flyer_tmp        # no unzip? use: python3 -m zipfile -e flyer.zip _flyer_tmp
+
+# 3. remove the old RaiderLoop app file and old logo files
 rm -f App.jsx App.js index.jsx
-# unzip flyer.zip here, then copy everything except node_modules:
-cp -r flyer/App.js flyer/src flyer/assets flyer/targets flyer/functions \
-      flyer/app.json flyer/eas.json flyer/firebase.json \
-      flyer/firestore.rules flyer/firestore.indexes.json .
+rm -f assets/android-icon-*.png
+
+# 4. copy the Flyer files in (the trailing "/." also copies hidden files like functions/.env)
+cp -r _flyer_tmp/flyer/. .
+
+# 5. clean up
+rm -rf _flyer_tmp flyer.zip
 ```
+
+Your `package.json`, `node_modules`, `.git`, and `.firebaserc` are not touched. If your entry file is `index.ts`, check that it imports `./App` (`cat index.ts`). Otherwise set `"main": "node_modules/expo/AppEntry.js"` in `package.json`.
 
 Your `package.json` must have `"main": "node_modules/expo/AppEntry.js"` (or an `index.js` that registers `./App`).
 
@@ -27,7 +40,14 @@ npx expo install react-native-svg react-native-maps react-native-safe-area-conte
   expo-auth-session expo-web-browser expo-crypto expo-apple-authentication \
   expo-tracking-transparency expo-dev-client @react-native-async-storage/async-storage \
   @expo-google-fonts/nunito @expo-google-fonts/caveat @expo-google-fonts/permanent-marker \
-  react-native-google-mobile-ads react-native-purchases @bacons/apple-targets firebase
+  react-native-google-mobile-ads react-native-purchases @bacons/apple-targets firebase \
+  expo-camera expo-task-manager expo-constants expo-image-manipulator react-native-qrcode-svg
+```
+
+Then update `app.json` for the camera, background location (nearby alerts only), and photo permissions. This keeps your EAS project ID:
+
+```bash
+python3 scripts/patch-app-json.py app.json
 ```
 
 Ads, purchases, and the widget are native modules, so **Expo Go can't run the full app**. Use EAS builds, which you already do. Every native module is loaded defensively, though, so in Expo Go the rest of the app still opens and those features say they aren't available.
@@ -47,15 +67,17 @@ This is a new app, not an update to RaiderLoop. Your TestFlight testers will nee
 `src/config.js` still points at `raiderloop-98046`, so your existing secrets and cache carry over.
 
 1. **Turn on sign-in methods.** Firebase console → Authentication → Sign-in method → enable **Email/Password**, **Anonymous**, and **Apple**. For Apple, follow the console's steps (Services ID + key from your Apple Developer account).
-2. **Deploy rules, indexes, and functions:**
+2. **Turn on Storage** (chat photos): Firebase console → Storage → Get started → keep the default bucket.
+3. **Deploy rules, indexes, and functions:**
    ```bash
-   firebase deploy --only firestore:rules,firestore:indexes
+   firebase deploy --only firestore:rules,firestore:indexes,storage
    firebase functions:secrets:set REVENUECAT_WEBHOOK_AUTH   # any long random string
    cd functions && npm install && cd ..
    firebase deploy --only functions
    ```
+   New indexes take a few minutes to build. Until they're ready, Messages and meetups may look empty.
    `askRed` is still deployed, so the old RaiderLoop TestFlight build keeps working until people switch.
-3. **Set spending limits.** Do this now, not later:
+4. **Set spending limits.** Do this now, not later:
    - console.anthropic.com → Limits → set a monthly spend limit
    - Tavily dashboard → plan / usage cap
    - Google Cloud console → Billing → Budgets & alerts → add a budget with email alerts
@@ -64,6 +86,15 @@ This is a new app, not an update to RaiderLoop. Your TestFlight testers will nee
 
 ### Optional: App Check
 App Check blocks requests that don't come from your real app. It needs the native Firebase SDK (`@react-native-firebase/app-check`), which is a bigger change, so it's off for now. Auth plus per-user limits cover the main risk. When you add it, set `ENFORCE_APP_CHECK=true` in `functions/.env` and redeploy.
+
+### Push notifications (messages, meetups, friend requests, nearby alerts)
+Apple needs a push key on file with EAS. Run `eas credentials` → iOS → production → **Push Notifications: Manage your Apple Push Notifications Key** → let EAS create one. (Or answer **Yes** to the push question on your next `eas build`.) No server key is needed: Flyer's functions send through Expo's push service.
+
+### Moderation (required by Apple for chat)
+- Reports land in Firestore → `reports`. Check it at least daily; Apple expects action within 24 hours.
+- To remove a message: open `chats/{chatId}/messages/{id}` and set `hidden: true` (or delete it).
+- To ban someone: Firebase console → Authentication → find the user → Disable account.
+- A message reported by two different people hides itself automatically.
 
 ## 5. Things that need your accounts
 
@@ -102,3 +133,5 @@ Suggested rollout: a **public TestFlight link** first (up to 10,000 testers, lig
 - [ ] App Store privacy "nutrition label" filled in to match `docs/privacy.html` (see `docs/APP_STORE.md`)
 - [ ] New screenshots taken from the Flyer build
 - [ ] Name search done: App Store + USPTO TESS for "Flyer" in software classes
+- [ ] Two demo accounts (friends with each other) for App Review, listed in `docs/APP_STORE.md`
+- [ ] Someone checks `reports` in Firestore every day

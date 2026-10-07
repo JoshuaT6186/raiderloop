@@ -3,7 +3,7 @@
 **Name:** Flyer — Campus Planner
 **Subtitle (30 chars):** Classes, campus & friends
 **Category:** Education (secondary: Lifestyle)
-**Age rating:** 12+ (it has location sharing with friends, but no open chat). Answer the questionnaire honestly; "Unrestricted web access" = No.
+**Age rating:** answer the questionnaire honestly. Flyer now has user-to-user messaging and photo sharing (friends only, filtered, reportable) and location sharing, so expect **17+** unless Apple's questionnaire says otherwise. "Unrestricted web access" = No.
 
 ## Description
 Flyer folds your whole campus into one app. Built by a student, for students.
@@ -26,11 +26,21 @@ KNOW YOUR CAMPUS
 FIND YOUR PEOPLE
 • 500+ student organizations, including Greek life
 • Live events and campus headlines
-• Add friends with a code and draw your own doodle avatar
+• Add friends by scanning their QR code, and draw your own doodle avatar
+• Message friends, or start a flock (a small group chat) with up to 15 friends
+• Send meetup cards: pick a public campus spot and a time, then check in together
+• Share your schedule (just free/busy, or full) with the friends you choose, and find a time everyone's free
+• Find classmates in your section (verified TTU students only, opt-in)
 • Share where you are (like at a game) with only the friends you pick, for as long as you choose. Turn it off instantly anytime.
+
+EXPLORE
+• Flight passport: stamp new buildings, games, events, and the Rec as you explore campus
+• Rate study spots and dining halls (only after you've checked in)
+• Optional nearby alerts when a friend who also opted in is close by on campus
 
 ASK PILOT
 • Tap the paper airplane and ask anything about campus
+• Snap a photo of notes or a problem and Pilot walks you through it step by step
 
 Flyer is an independent, student-built app and is not affiliated with, endorsed by, or sponsored by any university.
 
@@ -42,21 +52,32 @@ Terms: [your terms URL] · Privacy: [your privacy URL]
 ## App Privacy ("nutrition label")
 - **Contact Info → Email address:** App Functionality; linked to user; not tracking
 - **Contact Info → Name:** App Functionality; linked
-- **Location → Precise location:** App Functionality (friend sharing, only when the user turns it on); linked; not tracking
-- **Identifiers → User ID:** App Functionality; linked
+- **Location → Precise location:** App Functionality (friend sharing, check-ins, only when the user acts); linked; not tracking
+- **Location → Coarse location:** App Functionality (nearby alerts, opt-in); linked; not tracking
+- **User Content → Emails or text messages:** App Functionality (chat); linked
+- **User Content → Photos or videos:** App Functionality (chat photos, Pilot photos); linked
+- **User Content → Other user content:** App Functionality (ratings, shared schedule); linked
+- **Identifiers → User ID / Device ID (push token):** App Functionality; linked
 - **Identifiers → Device ID:** Third-party advertising (AdMob); tracking **only if the user allows ATT**
 - **Usage Data → Advertising data:** Third-party advertising
 - **Purchases → Purchase history:** App Functionality (RevenueCat)
-- **User Content → Photos:** App Functionality (schedule screenshot, processed and not stored); not linked
-- **User Content → Other user content:** App Functionality (Pilot questions, processed and not stored); not linked
 
 ## Review notes (paste into App Review Information)
-> Flyer is an independent, student-built campus app; it doesn't use any university login. To review without making an account, tap "Let's fly" → "Look around first". Friend features need an account: [create a demo account and put its email and password here]. Location sharing is opt-in, friends-only, foreground-only, and can be turned off instantly ("Go invisible"). Users can block others from the friend menu. Pilot uses Anthropic's Claude to answer campus questions. Canvas sign-in is shown as "waiting on approval" because it needs a key from the university.
+> Flyer is an independent, student-built campus app; it doesn't use any university login. To review without making an account, tap "Let's fly" → "Look around first". Social features need an account: [create TWO demo accounts that are friends with each other, and put both emails and passwords here, so the reviewer can see chat, flocks, and meetups].
+>
+> **User-generated content (Guideline 1.2):** messages and photos are only between accepted friends (or a flock made of friends). Text is filtered for objectionable words; photos are checked by an automated safety filter before anyone can see them. Every message has Report, Hide, and Block (press and hold a message). Every person has Report and Block (their profile, class lists, and chat info). Reported content is reviewed within 24 hours; a message reported by two people is hidden immediately. Terms of use state zero tolerance for objectionable content. Messages auto-delete after 30 days.
+>
+> **Background location (Guideline 5.1.1/2.5.4):** used only by "Nearby alerts", which is off by default and turned on in Friends → Sharing. It tells two friends who BOTH opted in that they're close by on campus. No one is shown anyone's location. All other location use is while the app is open (check-ins and optional live sharing).
+>
+> **Account deletion (5.1.1(v)):** You → Settings → Delete account. It deletes all server data and the sign-in, and revokes Sign in with Apple tokens.
+>
+> Pilot uses Anthropic's Claude to answer campus questions and explain photos of schoolwork step by step. Canvas sign-in is shown as "waiting on approval" because it needs a key from the university. Camera is used for QR codes and photos the user chooses to send.
 
 ## Screenshots to take (6.9" iPhone)
-1. Home ("Good morning" + weather + up next)
-2. Planner week strip
-3. Discover corkboard
-4. Campus map with a friend avatar
-5. Pilot answering a question
-6. Avatar studio
+1. Home ("Good morning" + weather + up next + a meetup card)
+2. Flight passport with stamps
+3. Campus map with the Rate card on a building
+4. A flock chat with a meetup card
+5. Find a time we're all free
+6. Pilot explaining a photo of notes
+7. Avatar studio

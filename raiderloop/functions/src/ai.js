@@ -8,17 +8,33 @@ const C = require('./common');
 
 const { db, HttpsError, ANTHROPIC_API_KEY, TAVILY_API_KEY, HOUR } = C;
 const BOTH = [ANTHROPIC_API_KEY, TAVILY_API_KEY];
-const LIMITS = { pilotFree: 25, pilotPlus: 150, scans: 5, lookups: 80 };
+const LIMITS = { pilotFree: 25, pilotPlus: 150, scans: 5, lookups: 80, photosFree: 5, photosPlus: 20 };
 
 /* ---------------- Pilot ---------------- */
 async function pilot(request) {
   const uid = C.requireAuth(request);
-  const { question, context, history } = request.data || {};
-  if (!question || typeof question !== 'string' || !question.trim()) throw new HttpsError('invalid-argument', 'Ask a question first.');
-  if (question.length > 600) throw new HttpsError('invalid-argument', 'That question is a bit long — try a shorter one.');
+  const { question, context, history, image } = request.data || {};
+  const hasImage = !!(image && typeof image.base64 === 'string' && image.base64.length > 100);
+  const q = String(question || '').trim() || (hasImage ? 'Help me understand this.' : '');
+  if (!q) throw new HttpsError('invalid-argument', 'Ask a question first.');
+  if (q.length > 600) throw new HttpsError('invalid-argument', 'That question is a bit long — try a shorter one.');
   const plus = await C.isPlus(uid);
+  if (hasImage) {
+    if (image.base64.length > 6_600_000) throw new HttpsError('invalid-argument', 'That photo is too large — try again a little farther back.');
+    await C.takeQuota(uid, 'pilotPhoto', plus ? LIMITS.photosPlus : LIMITS.photosFree,
+      plus ? "That's today's photo questions — they reset at midnight." : `That's all ${LIMITS.photosFree} free photo questions for today — they reset at midnight, or Flyer Plus gives you ${LIMITS.photosPlus}.`);
+  }
   await C.takeQuota(uid, 'pilot', plus ? LIMITS.pilotPlus : LIMITS.pilotFree,
     plus ? "You've reached today's question limit. It resets at midnight." : `That's all ${LIMITS.pilotFree} free questions for today — they reset at midnight, or Flyer Plus gives you ${LIMITS.pilotPlus} a day.`);
+
+  const tutor = hasImage ? `
+
+The student attached a photo (notes, a worksheet, a textbook page, a whiteboard, a problem). Act like a good tutor:
+- Explain the idea and walk through the method step by step so they can do it themselves.
+- For anything that looks like graded work (homework, a quiz, a take-home exam), do NOT just hand over final answers. Show how to approach it, work a similar example, or check their own attempt.
+- If the photo is blurry or cut off, say what you can't read and ask for a clearer shot.
+- If the photo isn't schoolwork, just answer helpfully about what's in it.
+- You may use up to 8 short sentences or a short numbered list for steps.` : '';
 
   const system = `You are Pilot, the assistant inside Flyer — an independent, student-built campus app (not affiliated with or endorsed by any university). You help a Texas Tech University student in Lubbock, TX.
 
@@ -26,7 +42,7 @@ First answer from the real data in <context>. If the answer isn't there but is a
 
 For anything about safety or an emergency, tell them to call 911 first.
 
-Keep answers short: 1-3 sentences, friendly, plain text (no markdown headings).
+Keep answers short: 1-3 sentences, friendly, plain text (no markdown headings).${tutor}
 
 <context>
 ${String(context || '').slice(0, 24000)}
@@ -43,9 +59,14 @@ ${String(context || '').slice(0, 24000)}
   const msgs = [];
   for (const m of prior) { if (!msgs.length && m.role !== 'user') continue; if (msgs.length && msgs[msgs.length - 1].role === m.role) continue; msgs.push(m); }
   if (msgs.length && msgs[msgs.length - 1].role === 'user') msgs.pop();
-  msgs.push({ role: 'user', content: question });
+  const okTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+  msgs.push({ role: 'user', content: hasImage ? [
+    { type: 'image', source: { type: 'base64', media_type: okTypes.includes(image.mediaType) ? image.mediaType : 'image/jpeg', data: image.base64 } },
+    { type: 'text', text: q },
+  ] : q });
 
-  let data = await C.callClaude({ system, messages: msgs, maxTokens: 450, tools });
+  const maxTokens = hasImage ? 900 : 450;
+  let data = await C.callClaude({ system, messages: msgs, maxTokens, tools });
   const toolUse = (data.content || []).find((b) => b.type === 'tool_use');
   let sources = [];
   if (toolUse && toolUse.name === 'search_web') {
@@ -54,14 +75,14 @@ ${String(context || '').slice(0, 24000)}
     const summary = (results.results || []).map((r) => `${r.title} (${r.url}): ${r.content}`.slice(0, 500)).join('\n\n') || 'No results found.';
     msgs.push({ role: 'assistant', content: data.content });
     msgs.push({ role: 'user', content: [{ type: 'tool_result', tool_use_id: toolUse.id, content: summary }] });
-    data = await C.callClaude({ system, messages: msgs, maxTokens: 450, tools });
+    data = await C.callClaude({ system, messages: msgs, maxTokens, tools });
   }
   const text = (data.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim()
     || "I don't have verified information on that yet.";
   return { text, sources };
 }
 
-exports.askPilot = onCall(C.callOpts(BOTH), pilot);
+exports.askPilot = onCall({ ...C.callOpts(BOTH), memory: '512MiB', timeoutSeconds: 90 }, pilot);
 /* Old RaiderLoop builds call askRed — keep it working until they update. */
 exports.askRed = onCall(C.callOpts(BOTH), pilot);
 
@@ -102,7 +123,7 @@ exports.getEvents = onCall(C.callOpts(BOTH), async (request) => {
     const images = (results.images || []).slice(0, 8);
     const text = await C.claudeText({
       system: `Extract real, distinct upcoming campus events from this search text about Texas Tech University. Return ONLY a JSON array. Each:
-{ "title": string, "org": string, "date": string (as stated, e.g. "Today", "Oct 9"), "time": string (e.g. "7:00 PM" or ""), "endTime": string, "location": string, "desc": string (one sentence, your own words), "sourceUrl": string, "startsAt": ISO 8601 with -05:00 offset if date AND time are known, else "" }
+{ "title": string, "org": string, "date": string (as stated, e.g. "Today", "Oct 9"), "time": string (e.g. "7:00 PM" or ""), "endTime": string, "location": string, "desc": string (one sentence, your own words), "sourceUrl": string, "startsAt": ISO 8601 with ${C.chicagoOffset()} offset (Lubbock time) if date AND time are known, else "" }
 Only include events with a real stated date. If none qualify, return [].
 ${C.recencyGuard()}
 

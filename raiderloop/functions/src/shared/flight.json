@@ -1,0 +1,19 @@
+{
+  "_note": "Flight score rules, shared by the app (to explain them) and the server (to enforce them).",
+  "points": { "game": 40, "event": 25, "rec": 15, "spot": 10, "dining": 5, "repeatRec": 3, "rating": 2, "meetup": 20, "meetupBig": 30 },
+  "levels": [
+    { "min": 0, "title": "Fledgling" },
+    { "min": 100, "title": "Sparrow" },
+    { "min": 250, "title": "Falcon" },
+    { "min": 500, "title": "Hawk" },
+    { "min": 1000, "title": "Eagle" }
+  ],
+  "caps": { "checkInsPerDay": 10, "pointsPerWeek": 300, "meetupBonusesPerDay": 3 },
+  "radiusM": 150,
+  "maxAccuracyM": 75,
+  "gameWindow": { "beforeMin": 120, "afterMin": 240 },
+  "eventWindow": { "beforeMin": 30, "afterMin": 180 },
+  "meetupWindow": { "beforeMin": 15, "afterMin": 30 },
+  "gameVenues": ["jones-att-stadium"],
+  "tierLabels": { "game": "Game day", "event": "Event", "rec": "Rec & spirit", "spot": "New spot", "dining": "Dining" }
+}

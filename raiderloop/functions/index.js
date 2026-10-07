@@ -12,7 +12,13 @@
  *   DAILY_PAID_CALL_CAP=2500 — global daily ceiling on paid API calls
  *   ENFORCE_APP_CHECK=false  — set true once App Check is set up
  *
+ * Storage: chat photos live in Firebase Storage (storage.rules).
+ *
  * Every callable requires a signed-in user (guests are anonymous
  * Firebase users) and paid endpoints are limited per user per day.
  */
-Object.assign(exports, require('./src/ai'), require('./src/social'), require('./src/canvas'));
+Object.assign(
+  exports,
+  require('./src/ai'), require('./src/social'), require('./src/canvas'),
+  require('./src/places'), require('./src/chat'), require('./src/share'), require('./src/account'),
+);

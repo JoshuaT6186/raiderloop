@@ -13,7 +13,10 @@ import Icon from '../ui/Icon';
 import Avatar from '../ui/Avatar';
 import AvatarSheet from '../sheets/AvatarStudio';
 import MajorPicker from '../sheets/MajorPicker';
-import { signOut, deleteMyAccount, api } from '../lib/firebase';
+import { signOut, api } from '../lib/firebase';
+import { levelFor } from '../data/places';
+import { unregisterPush } from '../lib/push';
+import { stopNearby } from '../lib/nearby';
 import { openUrl, shareText } from '../lib/links';
 import { sharingActive } from '../lib/location';
 import { APP, LIMITS, SCHOOLS, PURCHASES } from '../config';
@@ -63,7 +66,7 @@ function ProfileCard() {
 
 function FriendsPeek() {
   const { t } = useTheme();
-  const { friends, requests, sharing, setSheet, user } = useApp();
+  const { friends, requests, sharing, setSheet, user, unreadChats, pendingMeetups } = useApp();
   const live = sharingActive(sharing);
   return (
     <>
@@ -83,7 +86,38 @@ function FriendsPeek() {
           <Pressable onPress={() => setSheet({ type: 'friends', tab: 'sharing' })}><T kind="hand" color={t.accent}>settings</T></Pressable>
         </View>
       </Card>
+      {user && !user.isAnonymous ? (
+        <Card style={{ marginTop: 10 }} onPress={() => setSheet({ type: 'chats' })}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Icon name="chat" color={t.ink} />
+            <T kind="bold" style={{ marginLeft: 8, flex: 1 }}>Messages</T>
+            {unreadChats ? <Stamp label={`${unreadChats} new`} color={t.redPen} /> : null}
+            {pendingMeetups ? <Stamp label={`${pendingMeetups} invite${pendingMeetups === 1 ? '' : 's'}`} color={t.accent} style={{ marginLeft: 6 }} /> : null}
+            <Icon name="chevronRight" size={18} color={t.faint} style={{ marginLeft: 6 }} />
+          </View>
+        </Card>
+      ) : null}
     </>
+  );
+}
+
+function FlightCard() {
+  const { flight, setSheet, user } = useApp();
+  if (!user || user.isAnonymous) return null;
+  const score = flight.score || 0;
+  const lvl = levelFor(score);
+  const stamps = Object.values(flight.stamps || {}).filter((s) => !s.routine).length;
+  return (
+    <PostIt color="green" seed="passport" tape style={{ marginTop: 18 }} onPress={() => setSheet({ type: 'passport' })}>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <Icon name="passport" color="#1F2A44" size={28} />
+        <View style={{ flex: 1, marginLeft: 10 }}>
+          <PT kind="title">Flight passport · {score}</PT>
+          <PT kind="small">{lvl.title} · {stamps} {stamps === 1 ? 'stamp' : 'stamps'}{lvl.next ? ` · ${lvl.toNext} to ${lvl.next.title}` : ''}</PT>
+        </View>
+        <Icon name="chevronRight" color="#1F2A44" />
+      </View>
+    </PostIt>
   );
 }
 
@@ -137,12 +171,9 @@ function Settings() {
 
   const doSignOut = () => Alert.alert('Sign out?', 'This clears Flyer on this phone and takes you back to the start. Your account and friends stay saved.', [
     { text: 'Cancel', style: 'cancel' },
-    { text: 'Sign out', style: 'destructive', onPress: async () => { await api.stopSharing({}).catch(() => {}); await signOut().catch(() => {}); resetAll(); } },
+    { text: 'Sign out', style: 'destructive', onPress: async () => { await api.stopSharing({}).catch(() => {}); await unregisterPush(); await stopNearby(); await signOut().catch(() => {}); resetAll(); } },
   ]);
-  const doDelete = () => Alert.alert('Delete account?', 'This permanently deletes your account, friends list, and any shared location from our servers, and clears this phone. It can\'t be undone.', [
-    { text: 'Cancel', style: 'cancel' },
-    { text: 'Delete forever', style: 'destructive', onPress: async () => { await deleteMyAccount(); await signOut().catch(() => {}); resetAll(); } },
-  ]);
+  const doDelete = () => setSheet({ type: 'deleteAccount' });
 
   return (
     <>
@@ -187,6 +218,7 @@ export default function You() {
     <Page eyebrow="your page" title="You">
       <ProfileCard />
       <FriendsPeek />
+      <FlightCard />
       <PlusCard />
       <Saved />
       <Settings />

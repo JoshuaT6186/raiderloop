@@ -1,0 +1,1190 @@
+{
+ "_note": "Check-in places, generated from src/data/buildings.js (OpenStreetMap). Housing, parking, health clinics and retail are left out on purpose. To add a park or outdoor spot, append to \"extra\" with coordinates you verified by dropping a pin on it in Apple or Google Maps, then redeploy functions.",
+ "places": [
+  {
+   "id": "chemistry-building",
+   "name": "Chemistry Building",
+   "lat": 33.583688,
+   "lng": -101.876247,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "mathematics-statistics",
+   "name": "Mathematics & Statistics",
+   "lat": 33.585007,
+   "lng": -101.876252,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "science-building",
+   "name": "Science Building",
+   "lat": 33.584421,
+   "lng": -101.877303,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "agricultural-education",
+   "name": "Agricultural Education",
+   "lat": 33.582723,
+   "lng": -101.877251,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "agricultural-sciences-building",
+   "name": "Agricultural Sciences Building",
+   "lat": 33.582834,
+   "lng": -101.876043,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "biology-building",
+   "name": "Biology Building",
+   "lat": 33.585066,
+   "lng": -101.878108,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "biology-lecture-hall",
+   "name": "Biology Lecture Hall",
+   "lat": 33.584675,
+   "lng": -101.877871,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "engineering-and-materials-research",
+   "name": "Engineering and Materials Research Center",
+   "lat": 33.585471,
+   "lng": -101.875415,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "experimental-sciences-building",
+   "name": "Experimental Sciences Building",
+   "lat": 33.585489,
+   "lng": -101.877435,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "food-technology",
+   "name": "Food Technology",
+   "lat": 33.582637,
+   "lng": -101.876375,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "national-wind-institute",
+   "name": "National Wind Institute",
+   "lat": 33.585622,
+   "lng": -101.876005,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "administration-building",
+   "name": "Administration Building",
+   "lat": 33.583238,
+   "lng": -101.874685,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "electrical-and-computer-engineerin",
+   "name": "Electrical and Computer Engineering",
+   "lat": 33.586684,
+   "lng": -101.875554,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "experimental-sciences-building-ii",
+   "name": "Experimental Sciences Building II",
+   "lat": 33.585523,
+   "lng": -101.878788,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "landscape-architecture-and-range-w",
+   "name": "Landscape Architecture and Range Wildlife and Fisheries Management",
+   "lat": 33.582693,
+   "lng": -101.878271,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "pulse-lab",
+   "name": "Pulse Lab",
+   "lat": 33.586385,
+   "lng": -101.876217,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "chemical-engineering",
+   "name": "Chemical Engineering",
+   "lat": 33.587611,
+   "lng": -101.87642,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "civil-engineering",
+   "name": "Civil Engineering",
+   "lat": 33.586684,
+   "lng": -101.873836,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "engineering-center",
+   "name": "Engineering Center",
+   "lat": 33.58726,
+   "lng": -101.875555,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "holden-hall",
+   "name": "Holden Hall",
+   "lat": 33.585591,
+   "lng": -101.873687,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "human-sciences-building",
+   "name": "Human Sciences Building",
+   "lat": 33.583355,
+   "lng": -101.873075,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "industrial-mechanical-systems-engi",
+   "name": "Industrial, Mechanical & Systems Engineering",
+   "lat": 33.587192,
+   "lng": -101.876376,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "computer-science",
+   "name": "Computer Science",
+   "lat": 33.587639,
+   "lng": -101.875317,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "engineering-technology-lab",
+   "name": "Engineering & Technology Lab",
+   "lat": 33.587196,
+   "lng": -101.8739,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "english-philosophy-building",
+   "name": "English/Philosophy Building",
+   "lat": 33.581412,
+   "lng": -101.879238,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "foreign-language-building",
+   "name": "Foreign Language Building",
+   "lat": 33.580866,
+   "lng": -101.878491,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "livermore-center",
+   "name": "Livermore Center",
+   "lat": 33.587693,
+   "lng": -101.876071,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "mechanical-engineering-south",
+   "name": "Mechanical Engineering South",
+   "lat": 33.588001,
+   "lng": -101.874706,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "psychology-building",
+   "name": "Psychology Building",
+   "lat": 33.580556,
+   "lng": -101.877155,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "west-hall",
+   "name": "West Hall",
+   "lat": 33.585325,
+   "lng": -101.87244,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "art-building",
+   "name": "Art Building",
+   "lat": 33.580722,
+   "lng": -101.880127,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "burkhart-center-for-autism-educati",
+   "name": "Burkhart Center for Autism Education & Research",
+   "lat": 33.580321,
+   "lng": -101.878483,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "college-of-media-and-communication",
+   "name": "College of Media and Communication",
+   "lat": 33.582051,
+   "lng": -101.880618,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "drane-hall",
+   "name": "Drane Hall",
+   "lat": 33.581614,
+   "lng": -101.872344,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "education-building",
+   "name": "Education Building",
+   "lat": 33.580319,
+   "lng": -101.879245,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "mechnical-engineering-north",
+   "name": "Mechnical Engineering North",
+   "lat": 33.588386,
+   "lng": -101.87495,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "petroleum-engineering",
+   "name": "Petroleum Engineering",
+   "lat": 33.587803,
+   "lng": -101.873711,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "rawls-college-of-business",
+   "name": "Rawls College of Business",
+   "lat": 33.587693,
+   "lng": -101.879439,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "weeks-hall",
+   "name": "Weeks Hall",
+   "lat": 33.583381,
+   "lng": -101.871686,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "architecture-building",
+   "name": "Architecture Building",
+   "lat": 33.580667,
+   "lng": -101.88068,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "cash-family-sports-nutrition-cente",
+   "name": "Cash Family Sports Nutrition Center",
+   "lat": 33.589662,
+   "lng": -101.875441,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "creative-motion-dance-studio",
+   "name": "Creative Motion Dance Studio",
+   "lat": 33.588083,
+   "lng": -101.872712,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "marsha-sharp-center-for-student-at",
+   "name": "Marsha Sharp Center for Student Athletics",
+   "lat": 33.58899,
+   "lng": -101.874746,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "frazier-alumni-pavilion",
+   "name": "Frazier Alumni Pavilion",
+   "lat": 33.589651,
+   "lng": -101.874702,
+   "kind": "Academic",
+   "tier": "spot"
+  },
+  {
+   "id": "southwest-collection-special-colle",
+   "name": "Southwest Collection/Special Collection Library",
+   "lat": 33.581932,
+   "lng": -101.877044,
+   "kind": "Library",
+   "tier": "spot"
+  },
+  {
+   "id": "texas-tech-university-library",
+   "name": "Texas Tech University Library",
+   "lat": 33.581411,
+   "lng": -101.876381,
+   "kind": "Library",
+   "tier": "spot"
+  },
+  {
+   "id": "little-panda",
+   "name": "Little Panda",
+   "lat": 33.583676,
+   "lng": -101.870347,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "one-guy",
+   "name": "One Guy",
+   "lat": 33.585303,
+   "lng": -101.870262,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "subway",
+   "name": "Subway",
+   "lat": 33.585072,
+   "lng": -101.87026,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "the-commons-food-court",
+   "name": "The Commons Food Court",
+   "lat": 33.57956,
+   "lng": -101.874184,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "7-brew-coffee",
+   "name": "7 Brew Coffee",
+   "lat": 33.581933,
+   "lng": -101.870304,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "braum-s",
+   "name": "Braum's",
+   "lat": 33.587156,
+   "lng": -101.870156,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "chimy-s",
+   "name": "Chimy's",
+   "lat": 33.584188,
+   "lng": -101.869735,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "cricket-s-grill",
+   "name": "Cricket's Grill",
+   "lat": 33.584791,
+   "lng": -101.869686,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "dreamer-s-bistro",
+   "name": "Dreamer's Bistro",
+   "lat": 33.586198,
+   "lng": -101.870379,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "jimmy-john-s",
+   "name": "Jimmy John's",
+   "lat": 33.584238,
+   "lng": -101.869467,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "raising-cane-s",
+   "name": "Raising Cane's",
+   "lat": 33.58679,
+   "lng": -101.870053,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "spanky-s",
+   "name": "Spanky's",
+   "lat": 33.587681,
+   "lng": -101.870316,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "papa-john-s",
+   "name": "Papa John's",
+   "lat": 33.587713,
+   "lng": -101.870125,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "tikka-shack",
+   "name": "Tikka Shack",
+   "lat": 33.58684,
+   "lng": -101.869327,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "whataburger",
+   "name": "Whataburger",
+   "lat": 33.587533,
+   "lng": -101.86937,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "chili-s",
+   "name": "Chili's",
+   "lat": 33.589315,
+   "lng": -101.870189,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "chipotle",
+   "name": "Chipotle",
+   "lat": 33.588066,
+   "lng": -101.869445,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "potbelly",
+   "name": "Potbelly",
+   "lat": 33.587526,
+   "lng": -101.868687,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "torchy-s-tacos",
+   "name": "Torchy's Tacos",
+   "lat": 33.586777,
+   "lng": -101.868749,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "velvet-taco",
+   "name": "Velvet Taco",
+   "lat": 33.588018,
+   "lng": -101.868741,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "wiggins-complex-dining-hall",
+   "name": "Wiggins Complex/Dining Hall",
+   "lat": 33.579701,
+   "lng": -101.883685,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "ihop",
+   "name": "IHOP",
+   "lat": 33.578544,
+   "lng": -101.870255,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "starbucks",
+   "name": "Starbucks",
+   "lat": 33.590412,
+   "lng": -101.870256,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "tropical-smoothie-cafe",
+   "name": "Tropical Smoothie Cafe",
+   "lat": 33.578229,
+   "lng": -101.869836,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "chick-fil-a",
+   "name": "Chick-fil-A",
+   "lat": 33.593513,
+   "lng": -101.870896,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "little-caesars",
+   "name": "Little Caesars",
+   "lat": 33.57821,
+   "lng": -101.866773,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "panda-express",
+   "name": "Panda Express",
+   "lat": 33.593515,
+   "lng": -101.869973,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "popeyes",
+   "name": "Popeyes",
+   "lat": 33.594404,
+   "lng": -101.870868,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "wienerschnitzel",
+   "name": "Wienerschnitzel",
+   "lat": 33.594028,
+   "lng": -101.870086,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "kfc",
+   "name": "KFC",
+   "lat": 33.594994,
+   "lng": -101.86998,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "sonic",
+   "name": "Sonic",
+   "lat": 33.598058,
+   "lng": -101.870913,
+   "kind": "Dining",
+   "tier": "dining"
+  },
+  {
+   "id": "united-supermarkets-arena",
+   "name": "United Supermarkets Arena",
+   "lat": 33.58778,
+   "lng": -101.8725,
+   "kind": "Athletics",
+   "tier": "rec"
+  },
+  {
+   "id": "student-recreation-center",
+   "name": "Student Recreation Center",
+   "lat": 33.582749,
+   "lng": -101.884498,
+   "kind": "Athletics",
+   "tier": "rec"
+  },
+  {
+   "id": "jones-att-stadium",
+   "name": "Galaxy Stadium",
+   "lat": 33.59109,
+   "lng": -101.87278,
+   "kind": "Athletics",
+   "tier": "rec"
+  },
+  {
+   "id": "quick-track",
+   "name": "Quick Track",
+   "lat": 33.578221,
+   "lng": -101.867129,
+   "kind": "Athletics",
+   "tier": "rec"
+  },
+  {
+   "id": "biology-greenhouse",
+   "name": "Biology Greenhouse",
+   "lat": 33.584715,
+   "lng": -101.878534,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "agricultural-pavillion",
+   "name": "Agricultural Pavillion",
+   "lat": 33.58221,
+   "lng": -101.876809,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "fisheries-wildlife-research",
+   "name": "Fisheries & Wildlife Research",
+   "lat": 33.582819,
+   "lng": -101.878848,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "bayer-plant-science-building",
+   "name": "Bayer Plant Science Building",
+   "lat": 33.582042,
+   "lng": -101.878515,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "child-development-research-center",
+   "name": "Child Development Research Center",
+   "lat": 33.582677,
+   "lng": -101.873382,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "goddard-range-and-wildlife-managem",
+   "name": "Goddard Range and Wildlife Management Building",
+   "lat": 33.582111,
+   "lng": -101.878144,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "dairy-barn",
+   "name": "Dairy Barn",
+   "lat": 33.581308,
+   "lng": -101.878119,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "development-building",
+   "name": "Development Building",
+   "lat": 33.581653,
+   "lng": -101.873055,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "music-building",
+   "name": "Music Building",
+   "lat": 33.580915,
+   "lng": -101.874529,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "doak-conference-center",
+   "name": "Doak Conference Center",
+   "lat": 33.582757,
+   "lng": -101.871636,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "mcclellan-hall",
+   "name": "McClellan Hall",
+   "lat": 33.581359,
+   "lng": -101.873171,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "lighthouse-college-tutoring",
+   "name": "Lighthouse College Tutoring",
+   "lat": 33.584142,
+   "lng": -101.870345,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "marines-officer-selection-office",
+   "name": "Marines Officer Selection Office",
+   "lat": 33.58591,
+   "lng": -101.870378,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "t-c-elli-s",
+   "name": "T. C. Elli's",
+   "lat": 33.584789,
+   "lng": -101.870132,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "bpl-plasma",
+   "name": "BPL Plasma",
+   "lat": 33.585194,
+   "lng": -101.869579,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "mckenzie-merket-alumni-center",
+   "name": "McKenzie-Merket Alumni Center",
+   "lat": 33.579504,
+   "lng": -101.87275,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "physical-plant",
+   "name": "Physical Plant",
+   "lat": 33.585632,
+   "lng": -101.883674,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "sports-performance-center",
+   "name": "Sports Performance Center",
+   "lat": 33.589501,
+   "lng": -101.873102,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "21-hundred-overton-park-leasing-of",
+   "name": "21 Hundred @ Overton Park Leasing Office",
+   "lat": 33.586705,
+   "lng": -101.869326,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "athletic-training-complex",
+   "name": "Athletic Training Complex",
+   "lat": 33.589727,
+   "lng": -101.871523,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "atlas-campus-fellowship",
+   "name": "Atlas Campus Fellowship",
+   "lat": 33.584795,
+   "lng": -101.86882,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "student-pool",
+   "name": "Student Pool",
+   "lat": 33.583569,
+   "lng": -101.884433,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "wildwood-lubbock-leasing-office",
+   "name": "Wildwood Lubbock Leasing Office",
+   "lat": 33.587959,
+   "lng": -101.870294,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "art-3d-annex",
+   "name": "Art 3D Annex",
+   "lat": 33.584843,
+   "lng": -101.88503,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "canterbury-campus-ministry",
+   "name": "Canterbury Campus Ministry",
+   "lat": 33.580319,
+   "lng": -101.869014,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "lovell-co-billiards-barstool",
+   "name": "Lovell Co Billiards & Barstool",
+   "lat": 33.579823,
+   "lng": -101.870217,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "physical-plant-annex",
+   "name": "Physical Plant Annex",
+   "lat": 33.585861,
+   "lng": -101.884899,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "heartline",
+   "name": "HeartLine",
+   "lat": 33.584199,
+   "lng": -101.867167,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "phillips-66",
+   "name": "Phillips 66",
+   "lat": 33.57814,
+   "lng": -101.870228,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "saint-elizabeth-s-catholic-center",
+   "name": "Saint Elizabeth's Catholic Center",
+   "lat": 33.584821,
+   "lng": -101.866879,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "university-parking-services-admini",
+   "name": "University Parking Services / Administrative Support Center",
+   "lat": 33.591752,
+   "lng": -101.880679,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "alon-2",
+   "name": "Alon",
+   "lat": 33.592627,
+   "lng": -101.879472,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "bodybronze",
+   "name": "BodyBronze",
+   "lat": 33.578154,
+   "lng": -101.868974,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "hampton-inn-suites-lubbock-univers",
+   "name": "Hampton Inn & Suites Lubbock University",
+   "lat": 33.592945,
+   "lng": -101.878323,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "john-saleh-catholic-student-center",
+   "name": "John Saleh Catholic Student Center",
+   "lat": 33.585192,
+   "lng": -101.865741,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "national-ranching-heritage-center",
+   "name": "National Ranching Heritage Center",
+   "lat": 33.590759,
+   "lng": -101.884096,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "state-farm",
+   "name": "State Farm",
+   "lat": 33.578155,
+   "lng": -101.869051,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "tarbox-law",
+   "name": "Tarbox Law",
+   "lat": 33.5842,
+   "lng": -101.866448,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "the-testosterhome",
+   "name": "The Testosterhome",
+   "lat": 33.581905,
+   "lng": -101.86639,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "2216-broadway",
+   "name": "2216 Broadway",
+   "lat": 33.584778,
+   "lng": -101.865403,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "alon",
+   "name": "Alon",
+   "lat": 33.592078,
+   "lng": -101.870356,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "choochai",
+   "name": "Choochai",
+   "lat": 33.578205,
+   "lng": -101.867442,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "combest",
+   "name": "Combest",
+   "lat": 33.584819,
+   "lng": -101.864905,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "hyatt-place-lubbock",
+   "name": "Hyatt Place Lubbock",
+   "lat": 33.589759,
+   "lng": -101.866851,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "overton-hotel-conference-center",
+   "name": "Overton Hotel & Conference Center",
+   "lat": 33.590908,
+   "lng": -101.867876,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "conoco",
+   "name": "Conoco",
+   "lat": 33.577995,
+   "lng": -101.867172,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "fiestas-del-llano",
+   "name": "Fiestas Del Llano",
+   "lat": 33.594503,
+   "lng": -101.869969,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "residence-inn",
+   "name": "Residence Inn",
+   "lat": 33.593809,
+   "lng": -101.868695,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "back-clubhouse",
+   "name": "Back Clubhouse",
+   "lat": 33.595426,
+   "lng": -101.884221,
+   "kind": "Campus",
+   "tier": "spot"
+  },
+  {
+   "id": "student-union",
+   "name": "Student Union",
+   "lat": 33.581551,
+   "lng": -101.87477,
+   "kind": "Services",
+   "tier": "spot"
+  },
+  {
+   "id": "wells-fargo",
+   "name": "Wells Fargo",
+   "lat": 33.583802,
+   "lng": -101.870258,
+   "kind": "Services",
+   "tier": "spot"
+  },
+  {
+   "id": "wesley-foundation",
+   "name": "Wesley Foundation",
+   "lat": 33.581935,
+   "lng": -101.869973,
+   "kind": "Services",
+   "tier": "spot"
+  },
+  {
+   "id": "amazon-lubbock",
+   "name": "Amazon@Lubbock",
+   "lat": 33.586764,
+   "lng": -101.869165,
+   "kind": "Services",
+   "tier": "spot"
+  },
+  {
+   "id": "chase",
+   "name": "Chase",
+   "lat": 33.588076,
+   "lng": -101.870299,
+   "kind": "Services",
+   "tier": "spot"
+  },
+  {
+   "id": "city-bank",
+   "name": "City Bank",
+   "lat": 33.588614,
+   "lng": -101.87019,
+   "kind": "Services",
+   "tier": "spot"
+  },
+  {
+   "id": "texas-tech-police-department",
+   "name": "Texas Tech Police Department",
+   "lat": 33.591841,
+   "lng": -101.879808,
+   "kind": "Services",
+   "tier": "spot"
+  },
+  {
+   "id": "bank-of-america",
+   "name": "Bank of America",
+   "lat": 33.578181,
+   "lng": -101.867604,
+   "kind": "Services",
+   "tier": "spot"
+  },
+  {
+   "id": "baptist-student-center",
+   "name": "Baptist Student Center",
+   "lat": 33.583285,
+   "lng": -101.868631,
+   "kind": "Worship",
+   "tier": "spot"
+  },
+  {
+   "id": "kent-r-hance-chapel",
+   "name": "Kent R. Hance Chapel",
+   "lat": 33.579285,
+   "lng": -101.87133,
+   "kind": "Worship",
+   "tier": "spot"
+  },
+  {
+   "id": "st-john-s-united-methodist-church",
+   "name": "St. John's United Methodist Church",
+   "lat": 33.58137,
+   "lng": -101.869847,
+   "kind": "Worship",
+   "tier": "spot"
+  },
+  {
+   "id": "first-christian-church",
+   "name": "First Christian Church",
+   "lat": 33.584003,
+   "lng": -101.867872,
+   "kind": "Worship",
+   "tier": "spot"
+  },
+  {
+   "id": "saint-elizabeth-catholic-church",
+   "name": "Saint Elizabeth Catholic Church",
+   "lat": 33.584798,
+   "lng": -101.867709,
+   "kind": "Worship",
+   "tier": "spot"
+  },
+  {
+   "id": "st-paul-s-on-the-plains-episcopal-",
+   "name": "St. Paul's on the Plains Episcopal Church",
+   "lat": 33.580816,
+   "lng": -101.868682,
+   "kind": "Worship",
+   "tier": "spot"
+  },
+  {
+   "id": "saint-elizabeth-s-old-chapel",
+   "name": "Saint Elizabeth’s Old Chapel",
+   "lat": 33.585168,
+   "lng": -101.866804,
+   "kind": "Worship",
+   "tier": "spot"
+  },
+  {
+   "id": "first-baptist-church-lubbock",
+   "name": "First Baptist Church Lubbock",
+   "lat": 33.584,
+   "lng": -101.864673,
+   "kind": "Worship",
+   "tier": "spot"
+  },
+  {
+   "id": "university-theatre",
+   "name": "University Theatre",
+   "lat": 33.58021,
+   "lng": -101.877806,
+   "kind": "Arts",
+   "tier": "rec"
+  },
+  {
+   "id": "conference",
+   "name": "Conference",
+   "lat": 33.585245,
+   "lng": -101.86985,
+   "kind": "Arts",
+   "tier": "rec"
+  }
+ ],
+ "extra": []
+}

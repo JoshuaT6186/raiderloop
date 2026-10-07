@@ -37,7 +37,74 @@ function requireAuth(request, { account = false } = {}) {
   return a.uid;
 }
 
-const today = () => new Date().toISOString().slice(0, 10);
+/* Days roll over at midnight in Lubbock, not UTC, so "resets at
+   midnight" in the app's messages is true. */
+const TZ = 'America/Chicago';
+const chicagoDay = (ms = Date.now()) => new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
+const chicagoHour = (ms = Date.now()) => Number(new Intl.DateTimeFormat('en-US', { timeZone: TZ, hour: 'numeric', hourCycle: 'h23' }).format(new Date(ms))) % 24;
+const today = () => chicagoDay();
+/* Monday of the current week, as YYYY-MM-DD (Lubbock time). */
+function weekKey(ms = Date.now()) {
+  const d = new Date(`${chicagoDay(ms)}T12:00:00Z`);
+  const dow = (d.getUTCDay() + 6) % 7;
+  d.setUTCDate(d.getUTCDate() - dow);
+  return d.toISOString().slice(0, 10);
+}
+/* "2026-10-17T14:30:00" written in Lubbock local time → epoch ms.
+   Tries CDT then CST and keeps the one that round-trips. */
+function chicagoMs(localIso) {
+  const wantHour = Number(String(localIso).slice(11, 13));
+  for (const off of ['-05:00', '-06:00']) {
+    const ms = new Date(`${localIso}${off}`).getTime();
+    if (chicagoHour(ms) === wantHour) return ms;
+  }
+  return new Date(`${localIso}-06:00`).getTime();
+}
+/* "-05:00" during daylight time, "-06:00" otherwise (Lubbock). */
+function chicagoOffset(ms = Date.now()) {
+  const local = new Date(new Date(ms).toLocaleString('en-US', { timeZone: TZ }));
+  const utc = new Date(new Date(ms).toLocaleString('en-US', { timeZone: 'UTC' }));
+  const h = Math.round((utc - local) / 3600000);
+  return `-${String(h).padStart(2, '0')}:00`;
+}
+function distanceM(a, b) {
+  if (!a || !b) return null;
+  const R = 6371000; const rad = (x) => (x * Math.PI) / 180;
+  const dLat = rad(b.lat - a.lat); const dLng = rad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+const clean = (s, n = 60) => String(s == null ? '' : s).replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, n);
+
+/* Push notifications through Expo's push service (no key needed;
+   Apple delivery uses the push key stored in your EAS credentials).
+   Tokens live in pushTokens/{uid}. Muted chats are skipped. Dead
+   tokens are pruned. Never throws — a failed push must not fail the
+   action that caused it. */
+async function sendPush(uids, { title, body, data = {}, chatId = null }) {
+  try {
+    const ids = [...new Set((uids || []).filter(Boolean))];
+    if (!ids.length) return;
+    const snaps = await Promise.all(ids.map((u) => db.doc(`pushTokens/${u}`).get()));
+    const messages = [];
+    const owners = [];
+    snaps.forEach((s, i) => {
+      if (!s.exists) return;
+      const d = s.data();
+      if (chatId && d.muted && d.muted[chatId]) return;
+      (d.tokens || []).slice(-5).forEach((to) => { messages.push({ to, title, body: String(body || '').slice(0, 180), data, sound: 'default' }); owners.push([ids[i], to]); });
+    });
+    if (!messages.length) return;
+    const resp = await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify(messages),
+    });
+    const json = await resp.json().catch(() => null);
+    const tickets = (json && json.data) || [];
+    await Promise.all(tickets.map((tk, i) => (tk && tk.details && tk.details.error === 'DeviceNotRegistered'
+      ? db.doc(`pushTokens/${owners[i][0]}`).update({ tokens: FieldValue.arrayRemove(owners[i][1]) }).catch(() => {})
+      : null)));
+  } catch (e) { console.error('push failed', e.message); }
+}
 
 /* Per-user daily counters. Throws a friendly resource-exhausted error
    when the limit is hit; the app shows the message as-is. */
@@ -67,9 +134,10 @@ async function spend(n = 1) {
   await ref.set({ calls: FieldValue.increment(n) }, { merge: true });
 }
 
-async function callClaude({ system, messages, maxTokens, tools }) {
+const FAST_MODEL = 'claude-haiku-4-5-20251001';
+async function callClaude({ system, messages, maxTokens, tools, model }) {
   await spend();
-  const body = { model: MODEL, max_tokens: maxTokens, system, messages };
+  const body = { model: model || MODEL, max_tokens: maxTokens, system, messages };
   if (tools) body.tools = tools;
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -168,7 +236,7 @@ RECENCY RULES (apply before including ANY entry):
 const resultsText = (results) => (results.results || []).map((r) => `${r.title}\n${r.content}\nSource: ${r.url}`).join('\n\n---\n\n');
 
 module.exports = {
-  db, FieldValue, HttpsError, ANTHROPIC_API_KEY, TAVILY_API_KEY, HOUR, callOpts, requireAuth, takeQuota, isPlus,
+  db, FieldValue, HttpsError, ANTHROPIC_API_KEY, TAVILY_API_KEY, HOUR, FAST_MODEL, callOpts, requireAuth, takeQuota, isPlus,
   callClaude, claudeText, tavilySearch, tavilyExtract, getCached, setCached, cachedList, parseJsonArray, parseJsonObject,
-  recencyGuard, resultsText, today,
+  recencyGuard, resultsText, today, chicagoOffset, chicagoDay, chicagoHour, chicagoMs, weekKey, distanceM, clean, sendPush,
 };

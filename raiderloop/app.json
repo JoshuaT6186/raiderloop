@@ -27,12 +27,17 @@
         ]
       },
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "Flyer reads a screenshot of your class schedule so it can add your classes for you. You choose the image; nothing else in your library is accessed.",
-        "NSLocationWhenInUseUsageDescription": "Flyer uses your location while the app is open to sort nearby places by walking time, and — only if you turn it on — to share where you are with friends you choose.",
+        "NSPhotoLibraryUsageDescription": "Flyer reads only the photo you pick: a schedule screenshot to add your classes, or a photo to ask Pilot about or send to a friend.",
+        "NSLocationWhenInUseUsageDescription": "Flyer uses your location while the app is open to sort nearby places by walking time, to check you in at campus spots when you tap \"I'm here\", and — only if you turn it on — to share where you are with friends you choose.",
         "NSCalendarsUsageDescription": "Flyer adds your classes and due dates to a separate Flyer calendar when you tap Export.",
         "NSCalendarsFullAccessUsageDescription": "Flyer adds your classes and due dates to a separate Flyer calendar when you tap Export, and replaces them when you export again.",
         "NSUserTrackingUsageDescription": "This lets ads in Flyer be more relevant. Saying no is fine — you'll still see ads, just less relevant ones. Your schedule, location, and friends are never shared with advertisers.",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Only if you turn on Nearby alerts: Flyer checks your rough location in the background, on campus only, to tell you when a friend who also turned it on is close by. Friends never see where you are. Turn it off any time in Friends → Sharing.",
+        "NSCameraUsageDescription": "Flyer uses the camera to scan a friend's QR code, and to take a photo you choose to send to Pilot or a friend.",
+        "UIBackgroundModes": [
+          "location"
+        ]
       }
     },
     "android": {
@@ -47,10 +52,11 @@
         "android.permission.READ_CALENDAR",
         "android.permission.WRITE_CALENDAR",
         "android.permission.RECORD_AUDIO",
-        "com.google.android.gms.permission.AD_ID"
-      ],
-      "blockedPermissions": [
-        "ACCESS_BACKGROUND_LOCATION"
+        "com.google.android.gms.permission.AD_ID",
+        "ACCESS_BACKGROUND_LOCATION",
+        "CAMERA",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
       ]
     },
     "web": {
@@ -69,9 +75,11 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Flyer uses your location while the app is open to sort nearby places by walking time, and — only if you turn it on — to share where you are with friends you choose.",
-          "isIosBackgroundLocationEnabled": false,
-          "isAndroidBackgroundLocationEnabled": false
+          "locationWhenInUsePermission": "Flyer uses your location while the app is open to sort nearby places by walking time, to check you in at campus spots when you tap \"I'm here\", and — only if you turn it on — to share where you are with friends you choose.",
+          "locationAlwaysAndWhenInUsePermission": "Only if you turn on Nearby alerts: Flyer checks your rough location in the background, on campus only, to tell you when a friend who also turned it on is close by. Friends never see where you are. Turn it off any time in Friends → Sharing.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
         }
       ],
       [
@@ -83,8 +91,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Flyer reads a screenshot of your class schedule so it can add your classes for you.",
-          "cameraPermission": false
+          "photosPermission": "Flyer reads only the photo you pick: a schedule screenshot to add your classes, or a photo to ask Pilot about or send to a friend.",
+          "cameraPermission": "Flyer uses the camera to scan a friend's QR code, and to take a photo you choose to send to Pilot or a friend."
         }
       ],
       [
@@ -101,7 +109,15 @@
           "userTrackingUsageDescription": "This lets ads in Flyer be more relevant. Saying no is fine — you'll still see ads, just less relevant ones."
         }
       ],
-      "@bacons/apple-targets"
+      "@bacons/apple-targets",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Flyer uses the camera to scan a friend's QR code, and to take a photo you choose to send to Pilot or a friend.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ]
     ],
     "extra": {
       "eas": {

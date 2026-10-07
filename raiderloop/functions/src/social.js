@@ -1,44 +1,31 @@
 /**
- * Profiles, friends, location sharing, classmates, school requests,
- * sponsors, account deletion, and the RevenueCat webhook.
+ * Profiles, friends (handles + expiring QR codes), location sharing,
+ * class rosters, school requests, sponsors, and the RevenueCat
+ * webhook. Account deletion and data export live in account.js.
  *
  * All social writes go through these functions (Firestore rules deny
  * direct client writes), so every invariant lives in one place:
  *   • you can only share your location with current friends
- *   • removing/blocking a friend instantly removes their read access
+ *   • removing/blocking a friend instantly removes their access
  *   • nobody is ever told they were removed, declined, or blocked
  */
+const crypto = require('crypto');
 const { onCall, onRequest } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { defineSecret } = require('firebase-functions/params');
 const { getAuth } = require('firebase-admin/auth');
 const C = require('./common');
+const S = require('./socialCore');
 
-const { db, FieldValue, HttpsError } = C;
+const { db, FieldValue, HttpsError, clean } = C;
 const REVENUECAT_WEBHOOK_AUTH = defineSecret('REVENUECAT_WEBHOOK_AUTH');
 
-const clean = (s, n = 60) => String(s || '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, n);
 const AVATAR_KEYS = ['skin', 'hair', 'hairColor', 'eyes', 'mouth', 'facialHair', 'accessory', 'hat', 'shirt', 'shirtColor', 'bg', 'blush', 'number'];
 function cleanAvatar(a) {
   const out = {};
   if (!a || typeof a !== 'object') return out;
   for (const k of AVATAR_KEYS) if (a[k] != null) out[k] = typeof a[k] === 'boolean' ? a[k] : clean(a[k], 24);
   return out;
-}
-
-async function publicCard(uid) {
-  const s = await db.collection('users').doc(uid).get();
-  const d = s.exists ? s.data() : {};
-  return { name: d.name || '', handle: d.handle || '', avatar: d.avatar || {} };
-}
-async function isBlocked(a, b) {
-  const [x, y] = await Promise.all([
-    db.doc(`users/${a}/blocked/${b}`).get(), db.doc(`users/${b}/blocked/${a}`).get(),
-  ]);
-  return x.exists || y.exists;
-}
-async function areFriends(a, b) {
-  return (await db.doc(`users/${a}/friends/${b}`).get()).exists;
 }
 
 /* ---------- School requests ---------- */
@@ -50,7 +37,7 @@ exports.requestSchool = onCall(C.callOpts(), async (request) => {
   await C.takeQuota(uid, 'schoolReq', 5);
   const key = school.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 80);
   await db.collection('schoolRequests').doc(key).set({ name: school, count: FieldValue.increment(1), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-  if (email && /.+@.+\..+/.test(email)) await db.collection('schoolRequests').doc(key).collection('emails').doc(uid).set({ email, at: FieldValue.serverTimestamp() });
+  if (email && /.+@.+\..+/.test(email)) await db.collection('schoolRequests').doc(key).collection('emails').doc(uid).set({ email, uid, at: FieldValue.serverTimestamp() });
   return { ok: true };
 });
 
@@ -81,16 +68,19 @@ exports.saveProfile = onCall(C.callOpts(), async (request) => {
   const snap = await ref.get();
   let handle = snap.exists ? snap.data().handle : null;
   if (!handle) handle = await assignHandle(uid, name);
-  await ref.set({ name, avatar, schoolId, handle, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-  // Refresh my card inside each friend's list so they see my new avatar/name.
+  const verifiedEmail = S.verifiedSchoolEmail(request, schoolId);
+  await ref.set({ name, avatar, schoolId, handle, schoolVerified: !!verifiedEmail, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  // Refresh my card inside each friend's list and each chat I'm in.
   const friends = await ref.collection('friends').get();
   const batch = db.batch();
   friends.docs.forEach((f) => batch.set(db.doc(`users/${f.id}/friends/${uid}`), { name, avatar, handle }, { merge: true }));
+  const chats = await db.collection('chats').where('members', 'array-contains', uid).limit(100).get();
+  chats.docs.forEach((c) => batch.set(c.ref, { memberCards: { [uid]: { name, avatar } } }, { merge: true }));
   await batch.commit();
-  return { handle };
+  return { handle, schoolVerified: !!verifiedEmail };
 });
 
-/* ---------- Friends ---------- */
+/* ---------- Friends: requests by @handle ---------- */
 exports.sendFriendRequest = onCall(C.callOpts(), async (request) => {
   const uid = C.requireAuth(request, { account: true });
   await C.takeQuota(uid, 'friendReq', 40, "You've sent a lot of requests today — try again tomorrow.");
@@ -102,52 +92,32 @@ exports.sendFriendRequest = onCall(C.callOpts(), async (request) => {
     target = h.data().uid;
   }
   if (target === uid) throw new HttpsError('invalid-argument', "That's your own code!");
-  if (await areFriends(uid, target)) throw new HttpsError('already-exists', "You're already friends.");
+  if (await S.areFriends(uid, target)) throw new HttpsError('already-exists', "You're already friends.");
   // Blocked looks identical to "sent" — no signal either way.
-  if (await isBlocked(uid, target)) return { ok: true };
+  if (await S.isBlocked(uid, target)) return { ok: true };
   // If they already asked me, accept instead of making a second request.
   const theirs = await db.doc(`users/${uid}/requests/${target}`).get();
-  if (theirs.exists) { await makeFriends(uid, target); return { ok: true, accepted: true }; }
-  const me = await publicCard(uid);
-  await db.doc(`users/${target}/requests/${uid}`).set({ ...me, at: FieldValue.serverTimestamp() });
+  if (theirs.exists) { await S.makeFriends(uid, target); return { ok: true, accepted: true }; }
+  const me = await S.publicCard(uid);
+  await db.doc(`users/${target}/requests/${uid}`).set({ ...me, fromUid: uid, at: FieldValue.serverTimestamp() });
+  await C.sendPush([target], { title: 'New friend request', body: `${S.firstName(me.name) || 'Someone'} wants to be friends on Flyer.`, data: { open: 'friends', tab: 'requests' } });
   return { ok: true };
 });
-
-async function makeFriends(a, b) {
-  const [ca, cb] = await Promise.all([publicCard(a), publicCard(b)]);
-  const batch = db.batch();
-  batch.set(db.doc(`users/${a}/friends/${b}`), { ...cb, since: FieldValue.serverTimestamp() });
-  batch.set(db.doc(`users/${b}/friends/${a}`), { ...ca, since: FieldValue.serverTimestamp() });
-  batch.delete(db.doc(`users/${a}/requests/${b}`));
-  batch.delete(db.doc(`users/${b}/requests/${a}`));
-  await batch.commit();
-}
 
 exports.respondFriendRequest = onCall(C.callOpts(), async (request) => {
   const uid = C.requireAuth(request, { account: true });
   const from = clean(request.data?.uid, 64);
   const req = await db.doc(`users/${uid}/requests/${from}`).get();
   if (!req.exists) return { ok: true };
-  if (request.data?.accept && !(await isBlocked(uid, from))) await makeFriends(uid, from);
-  else await req.ref.delete(); // silent decline
+  const senderExists = (await db.doc(`users/${from}`).get()).exists;
+  if (request.data?.accept && senderExists && !(await S.isBlocked(uid, from))) await S.makeFriends(uid, from);
+  else await req.ref.delete(); // silent decline (or the sender deleted their account)
   return { ok: true };
 });
 
-async function unfriend(a, b) {
-  const batch = db.batch();
-  batch.delete(db.doc(`users/${a}/friends/${b}`));
-  batch.delete(db.doc(`users/${b}/friends/${a}`));
-  await batch.commit();
-  // Quiet revocation, both directions, effective immediately.
-  await Promise.all([
-    db.doc(`locations/${a}`).update({ allowed: FieldValue.arrayRemove(b) }).catch(() => {}),
-    db.doc(`locations/${b}`).update({ allowed: FieldValue.arrayRemove(a) }).catch(() => {}),
-  ]);
-}
-
 exports.removeFriend = onCall(C.callOpts(), async (request) => {
   const uid = C.requireAuth(request, { account: true });
-  await unfriend(uid, clean(request.data?.uid, 64));
+  await S.unfriend(uid, clean(request.data?.uid, 64));
   return { ok: true };
 });
 
@@ -155,12 +125,70 @@ exports.blockUser = onCall(C.callOpts(), async (request) => {
   const uid = C.requireAuth(request, { account: true });
   const other = clean(request.data?.uid, 64);
   if (!other || other === uid) throw new HttpsError('invalid-argument', 'Nobody to block.');
-  await unfriend(uid, other);
+  await S.unfriend(uid, other);
   await Promise.all([
     db.doc(`users/${uid}/blocked/${other}`).set({ at: FieldValue.serverTimestamp() }),
     db.doc(`users/${uid}/requests/${other}`).delete().catch(() => {}),
     db.doc(`users/${other}/requests/${uid}`).delete().catch(() => {}),
   ]);
+  // Nobody should be stuck in a flock with someone they blocked: if I
+  // run the flock, they're removed from it. (Elsewhere their messages
+  // are hidden from me and I can leave.)
+  const flocks = await db.collection('chats').where('admins', 'array-contains', uid).get();
+  await Promise.all(flocks.docs.filter((d) => d.data().type === 'flock' && (d.data().members || []).includes(other))
+    .map((d) => d.ref.update({ members: FieldValue.arrayRemove(other), admins: FieldValue.arrayRemove(other) })));
+  // Pending meetups between us are cancelled for both.
+  const meets = await db.collection('meetups').where('members', 'array-contains', uid).get();
+  await Promise.all(meets.docs.filter((d) => (d.data().members || []).includes(other) && (d.data().members || []).length === 2).map((d) => d.ref.delete()));
+  return { ok: true };
+});
+
+/* ---------- Friends: expiring QR / invite codes ----------
+   A code is a short random token that lasts 5 minutes (QR shown in
+   person) or 24 hours (invite link you send). Scanning or opening one
+   makes you friends right away — showing the code is the owner's
+   consent, scanning it is yours. Because codes expire and can be
+   reset, a screenshot posted online stops working. */
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function newToken(n = 8) {
+  const bytes = crypto.randomBytes(n);
+  return Array.from(bytes, (b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join('');
+}
+const normCode = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+
+exports.createFriendCode = onCall(C.callOpts(), async (request) => {
+  const uid = C.requireAuth(request, { account: true });
+  await C.takeQuota(uid, 'friendCode', 80, "That's a lot of new codes today — try again tomorrow.");
+  const kind = request.data?.kind === 'link' ? 'link' : 'qr';
+  const ttl = kind === 'link' ? 24 * 3600000 : 5 * 60000;
+  const token = newToken(8);
+  const expiresAt = Date.now() + ttl;
+  await db.doc(`friendCodes/${token}`).set({ uid, kind, expiresAt, createdAt: FieldValue.serverTimestamp() });
+  return { code: token, expiresAt, ttlMs: ttl, url: `flyer://add/${token}` };
+});
+
+exports.redeemFriendCode = onCall(C.callOpts(), async (request) => {
+  const uid = C.requireAuth(request, { account: true });
+  await C.takeQuota(uid, 'friendRedeem', 40, "That's a lot of codes today — try again tomorrow.");
+  const code = normCode(request.data?.code);
+  const snap = code.length >= 6 ? await db.doc(`friendCodes/${code}`).get() : null;
+  const bad = new HttpsError('not-found', "That code didn't work. Codes expire — ask them to show a fresh one.");
+  if (!snap || !snap.exists) throw bad;
+  const d = snap.data();
+  if (d.expiresAt < Date.now()) throw bad;
+  if (d.uid === uid) throw new HttpsError('invalid-argument', "That's your own code!");
+  if (await S.isBlocked(uid, d.uid)) throw bad;
+  const card = await S.publicCard(d.uid);
+  if (await S.areFriends(uid, d.uid)) return { ok: true, already: true, name: card.name };
+  await S.makeFriends(uid, d.uid);
+  const me = await S.publicCard(uid);
+  await C.sendPush([d.uid], { title: 'New friend', body: `You and ${S.firstName(me.name) || 'someone'} are now friends on Flyer.`, data: { open: 'friends' } });
+  return { ok: true, name: card.name };
+});
+
+exports.resetFriendCodes = onCall(C.callOpts(), async (request) => {
+  const uid = C.requireAuth(request, { account: true });
+  await S.deleteQuery(db.collection('friendCodes').where('uid', '==', uid));
   return { ok: true };
 });
 
@@ -170,8 +198,7 @@ exports.updateLocation = onCall(C.callOpts(), async (request) => {
   const d = request.data || {};
   const wanted = Array.isArray(d.allowed) ? d.allowed.map((x) => clean(x, 64)).slice(0, 200) : [];
   // Only current friends can ever be on the list.
-  const friendSnap = await db.collection('users').doc(uid).collection('friends').get();
-  const friendIds = new Set(friendSnap.docs.map((x) => x.id));
+  const friendIds = await S.friendIds(uid);
   const allowed = wanted.filter((x) => friendIds.has(x));
   const until = d.until && !Number.isNaN(Date.parse(d.until)) ? new Date(d.until).toISOString() : null;
   const ref = db.doc(`locations/${uid}`);
@@ -183,7 +210,7 @@ exports.updateLocation = onCall(C.callOpts(), async (request) => {
   }
   const lat = Number(d.lat); const lng = Number(d.lng);
   if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) throw new HttpsError('invalid-argument', 'Bad location.');
-  const me = await publicCard(uid);
+  const me = await S.publicCard(uid);
   await ref.set({
     lat, lng, precise: !!d.precise, allowed, until, name: me.name, avatar: me.avatar, updatedAt: FieldValue.serverTimestamp(),
   });
@@ -196,54 +223,111 @@ exports.stopSharing = onCall(C.callOpts(), async (request) => {
   return { ok: true };
 });
 
-/* Timed shares really end: expired location docs are deleted. */
+/* Timed shares really end, and short-lived codes really disappear. */
 exports.cleanupExpiredLocations = onSchedule('every 10 minutes', async () => {
   const now = new Date().toISOString();
-  const q = await db.collection('locations').where('until', '<', now).limit(400).get();
-  const batch = db.batch();
-  q.docs.forEach((d) => batch.delete(d.ref));
-  if (q.size) await batch.commit();
+  await S.deleteQuery(db.collection('locations').where('until', '<', now));
   // Also drop anything not refreshed in 2 hours (app closed long ago).
-  const stale = await db.collection('locations').where('updatedAt', '<', new Date(Date.now() - 2 * 3600000)).limit(400).get();
-  const b2 = db.batch();
-  stale.docs.forEach((d) => b2.delete(d.ref));
-  if (stale.size) await b2.commit();
+  await S.deleteQuery(db.collection('locations').where('updatedAt', '<', new Date(Date.now() - 2 * 3600000)));
+  await S.deleteQuery(db.collection('friendCodes').where('expiresAt', '<', Date.now()));
 });
 
-/* ---------- Classmates (opt-in) ---------- */
-const normCourse = (c) => clean(c, 16).toUpperCase().replace(/\s+/g, ' ');
+/* ---------- Class rosters (opt-in, verified TTU email) ----------
+   You appear only to other verified students who also opted in and
+   have the same class (and section, when both of you entered one).
+   Only a first name and avatar are shown. Enrollment itself is
+   self-reported until Canvas sign-in is available, and the app says
+   so. */
+const normCourse = (c) => clean(c, 24).toUpperCase().replace(/^([A-Z]{2,5})\s*-?\s*(\d{4}).*$/, '$1 $2').replace(/\s+/g, ' ');
+const normSection = (s) => clean(s, 6).toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+function needVerified(request) {
+  if (!S.verifiedSchoolEmail(request)) {
+    throw new HttpsError('failed-precondition', 'Verify your TTU email first (You → Friends → Classmates). It keeps class lists to real students.');
+  }
+}
 
 exports.setClassmateOptIn = onCall(C.callOpts(), async (request) => {
   const uid = C.requireAuth(request, { account: true });
   const ref = db.doc(`classmates/${uid}`);
   if (!request.data?.optIn) { await ref.delete().catch(() => {}); return { ok: true }; }
-  const courses = [...new Set((request.data.courses || []).map(normCourse).filter((c) => /^[A-Z]{2,5} \d{4}$/.test(c)))].slice(0, 10);
+  needVerified(request);
+  const raw = Array.isArray(request.data.classes) ? request.data.classes
+    : (request.data.courses || []).map((c) => ({ course: c }));
+  const classes = [];
+  for (const c of raw.slice(0, 12)) {
+    const course = normCourse(c && c.course);
+    if (!/^[A-Z]{2,5} \d{4}$/.test(course)) continue;
+    const section = normSection(c.section);
+    if (!classes.some((x) => x.course === course)) classes.push({ course, section });
+  }
   const user = await db.doc(`users/${uid}`).get();
-  await ref.set({ courses, schoolId: (user.exists && user.data().schoolId) || 'ttu', updatedAt: FieldValue.serverTimestamp() });
-  return { ok: true, courses };
+  await ref.set({
+    courses: classes.map((c) => c.course),
+    sections: classes.filter((c) => c.section).map((c) => `${c.course}-${c.section}`),
+    schoolId: (user.exists && user.data().schoolId) || 'ttu',
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+  return { ok: true, courses: classes.map((c) => c.course) };
 });
 
 exports.findClassmates = onCall(C.callOpts(), async (request) => {
   const uid = C.requireAuth(request, { account: true });
-  await C.takeQuota(uid, 'classmates', 20);
+  needVerified(request);
+  await C.takeQuota(uid, 'classmates', 30);
   const mine = await db.doc(`classmates/${uid}`).get();
-  if (!mine.exists) throw new HttpsError('failed-precondition', 'Turn on "Find classmates" first.');
-  const { courses, schoolId } = mine.data();
+  if (!mine.exists) throw new HttpsError('failed-precondition', 'Turn on "Show me in class lists" first.');
+  const { courses = [], sections = [], schoolId } = mine.data();
   const blockedSnap = await db.collection(`users/${uid}/blocked`).get();
   const blocked = new Set(blockedSnap.docs.map((d) => d.id));
+  const friends = await S.friendIds(uid);
   const matches = [];
   for (const course of courses) {
-    const q = await db.collection('classmates').where('schoolId', '==', schoolId).where('courses', 'array-contains', course).limit(40).get();
-    const others = q.docs.map((d) => d.id).filter((id) => id !== uid && !blocked.has(id));
+    const sec = sections.find((s) => s.startsWith(`${course}-`));
+    const q = sec
+      ? db.collection('classmates').where('schoolId', '==', schoolId).where('sections', 'array-contains', sec)
+      : db.collection('classmates').where('schoolId', '==', schoolId).where('courses', 'array-contains', course);
+    const snap = await q.limit(60).get();
+    const others = snap.docs.map((d) => d.id).filter((id) => id !== uid && !blocked.has(id));
     const people = [];
-    for (const id of others.slice(0, 8)) {
-      if (await isBlocked(uid, id)) continue;
-      const card = await publicCard(id);
-      people.push({ uid: id, name: card.name, avatar: card.avatar });
+    for (const id of others.slice(0, 25)) {
+      if (await S.isBlocked(uid, id)) continue;
+      const [card, req] = await Promise.all([S.publicCard(id), db.doc(`users/${id}/requests/${uid}`).get()]);
+      people.push({ uid: id, name: S.firstName(card.name), avatar: card.avatar, friend: friends.has(id), requested: req.exists });
     }
-    matches.push({ course, count: others.length, people });
+    matches.push({ course, section: sec ? sec.split('-')[1] : null, count: people.length, people });
   }
-  return { matches: matches.filter((m) => m.count > 0) };
+  return { matches };
+});
+
+/* ---------- Reports (people, messages, photos) ----------
+   Reports land in the `reports` collection for you to review in the
+   Firebase console. Apple expects you to act on them within 24 hours.
+   A message reported by two different people is hidden for everyone
+   right away. */
+exports.reportContent = onCall(C.callOpts(), async (request) => {
+  const uid = C.requireAuth(request, { account: true });
+  await C.takeQuota(uid, 'report', 30);
+  const d = request.data || {};
+  const report = {
+    by: uid, reason: clean(d.reason, 300) || 'No reason given', target: clean(d.uid, 64) || null,
+    chatId: clean(d.chatId, 80) || null, messageId: clean(d.messageId, 80) || null, kind: clean(d.kind, 20) || 'user',
+    at: FieldValue.serverTimestamp(), status: 'open',
+  };
+  if (report.chatId && report.messageId) {
+    const chat = await db.doc(`chats/${report.chatId}`).get();
+    if (!chat.exists || !(chat.data().members || []).includes(uid)) throw new HttpsError('permission-denied', 'You can only report messages in your own chats.');
+    const mref = db.doc(`chats/${report.chatId}/messages/${report.messageId}`);
+    const msg = await mref.get();
+    if (msg.exists) {
+      const m = msg.data();
+      report.target = m.from; report.text = m.text || null; report.image = m.image ? m.image.path : null;
+      const by = new Set([...(m.reportedBy || []), uid]);
+      await mref.update({ reportedBy: [...by], hidden: by.size >= 2 });
+    }
+  }
+  await db.collection('reports').add(report);
+  return { ok: true };
 });
 
 /* ---------- Sponsors (local businesses; added by you in Firestore) ---------- */
@@ -256,30 +340,6 @@ exports.getSponsors = onCall(C.callOpts(), async (request) => {
     .filter((s) => (!s.startsAt || s.startsAt <= now) && (!s.endsAt || s.endsAt >= now))
     .map((s) => ({ id: s.id, name: s.name, offer: s.offer, url: s.url, color: s.color || 'green', distance: s.distance || null }));
   return { sponsors };
-});
-
-/* ---------- Delete account ---------- */
-async function deleteCollection(path) {
-  const snap = await db.collection(path).get();
-  const batch = db.batch();
-  snap.docs.forEach((d) => batch.delete(d.ref));
-  await batch.commit();
-  return snap.docs;
-}
-
-exports.deleteAccount = onCall(C.callOpts(), async (request) => {
-  const uid = C.requireAuth(request);
-  const friends = await deleteCollection(`users/${uid}/friends`);
-  await Promise.all(friends.map((f) => unfriend(uid, f.id)));
-  await deleteCollection(`users/${uid}/requests`);
-  await deleteCollection(`users/${uid}/blocked`);
-  const user = await db.doc(`users/${uid}`).get();
-  if (user.exists && user.data().handle) await db.doc(`handles/${user.data().handle}`).delete().catch(() => {});
-  await Promise.all([
-    db.doc(`users/${uid}`).delete(), db.doc(`locations/${uid}`).delete(), db.doc(`classmates/${uid}`).delete(),
-    db.doc(`private/${uid}`).delete(),
-  ].map((p) => p.catch(() => {})));
-  return { ok: true };
 });
 
 /* ---------- RevenueCat → Flyer Plus ----------

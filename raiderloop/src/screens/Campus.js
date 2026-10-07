@@ -20,6 +20,8 @@ import {
   BUILDINGS, CAMPUS_CATS, catLabel, BUS_STOPS, distanceM, walkMinutes, liveHomeGame,
 } from '../data/campus';
 import { SCHOOLS } from '../config';
+import { placeById } from '../data/places';
+import { RatingSummary, useCheckIn } from '../sheets/PlaceExtras';
 
 const COLLAPSED = 250;
 const EXPANDED = SCREEN_H * 0.66;
@@ -56,6 +58,30 @@ function Tools() {
   );
 }
 
+/* Tapping a building on the map shows this little card first, with a
+   quick Rate button — a full sheet only when you ask for details. */
+function SelectedCard({ b, onClose }) {
+  const { setSheet } = useApp();
+  const { busy, run } = useCheckIn();
+  const place = placeById(b.id);
+  return (
+    <PostIt color="yellow" tilt={-0.6} padding={12} fold={false} style={{ marginTop: 10 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+        <View style={{ flex: 1 }}>
+          <PT kind="bold" numberOfLines={2}>{b.name}</PT>
+          {place ? <RatingSummary placeId={b.id} compact /> : <PT kind="small">{catLabel(b.kind)}</PT>}
+        </View>
+        <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Close"><Icon name="close" size={18} color="#1F2A44" /></Pressable>
+      </View>
+      <View style={{ flexDirection: 'row', marginTop: 8 }}>
+        {place ? <Button title="Rate" icon="star" small onPress={() => setSheet({ type: 'rate', placeId: b.id })} style={{ marginRight: 6 }} /> : null}
+        {place ? <Button title="I'm here" icon="check" small kind="ghost" loading={busy} onPress={() => run({ placeId: b.id })} style={{ marginRight: 6, backgroundColor: '#fff' }} /> : null}
+        <Button title="Details" small kind="ghost" onPress={() => setSheet({ type: 'building', id: b.id })} style={{ backgroundColor: '#fff' }} />
+      </View>
+    </PostIt>
+  );
+}
+
 export default function Campus() {
   const { t } = useTheme();
   const { setSheet, sheet, schoolId, friendLocations = [] } = useApp();
@@ -63,6 +89,7 @@ export default function Campus() {
   const [q, setQ] = useState('');
   const [pos, setPos] = useState(null);
   const [expanded, setExpanded] = useState(false);
+  const [selected, setSelected] = useState(null);
   const h = useRef(new Animated.Value(COLLAPSED)).current;
   const mapRef = useRef(null);
   const center = (SCHOOLS.find((s) => s.id === schoolId) || SCHOOLS[0]).center;
@@ -94,7 +121,7 @@ export default function Campus() {
         <MapView ref={mapRef} style={{ flex: 1 }} customMapStyle={t.mapStyle} showsUserLocation showsPointsOfInterest={false}
           initialRegion={{ latitude: center.latitude - 0.004, longitude: center.longitude, latitudeDelta: 0.022, longitudeDelta: 0.022 }}>
           {list.slice(0, 120).map((b) => (
-            <Marker key={b.id} coordinate={{ latitude: b.lat, longitude: b.lng }} onPress={() => setSheet({ type: 'building', id: b.id })} tracksViewChanges={false}>
+            <Marker key={b.id} coordinate={{ latitude: b.lat, longitude: b.lng }} onPress={() => setSelected(b)} tracksViewChanges={false}>
               <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: isOpenNow(b.hours) === true ? t.postit.green : t.postit.yellow, borderWidth: 2, borderColor: '#1F2A44' }} />
             </Marker>
           ))}
@@ -128,6 +155,7 @@ export default function Campus() {
             {['All', 'Open now', ...CAMPUS_CATS.filter((c) => c !== 'All')].map((c) => <Chip key={c} label={catLabel(c)} active={cat === c} onPress={() => setCat(c)} />)}
           </ScrollView>
           {visibleFriends.length ? <T kind="hand" style={{ marginTop: 2 }}>{visibleFriends.length} {visibleFriends.length === 1 ? 'friend' : 'friends'} sharing with you</T> : null}
+          {selected ? <SelectedCard b={selected} onClose={() => setSelected(null)} /> : null}
         </View>
       </SafeAreaView>
 

@@ -1,0 +1,22 @@
+rules_version = '2';
+// Flyer Storage rules. The only files are chat photos, stored at
+// chatImages/{chatId}/{uploaderUid}/{file}. Only members of that chat
+// can upload or view them; uploads must be images under 6 MB. A photo
+// isn't shown in the chat until the sendMessage function has checked
+// it, and rejected photos are deleted.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /chatImages/{chatId}/{uid}/{file} {
+      allow create: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.size < 6 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*')
+        && request.auth.uid in firestore.get(/databases/(default)/documents/chats/$(chatId)).data.members;
+      allow read: if request.auth != null
+        && request.auth.uid in firestore.get(/databases/(default)/documents/chats/$(chatId)).data.members;
+    }
+    match /{all=**} {
+      allow read, write: if false;
+    }
+  }
+}

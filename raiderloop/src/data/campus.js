@@ -6,6 +6,7 @@
 import { BUILDINGS } from './buildings';
 import { DINING } from './dining';
 import { ORGS } from './orgs';
+import FOOTBALL from '../../functions/src/shared/football.json';
 import { isOpenNow } from '../lib/hours';
 
 export { BUILDINGS, DINING, ORGS };
@@ -93,25 +94,13 @@ export const BUS_STOPS = [
   { id: 'bus-library', name: 'TTU Library', buildingId: 'texas-tech-university-library', route: 'Red Raider' },
 ].map((s) => { const b = buildingById(s.buildingId); return { ...s, lat: b?.lat, lng: b?.lng }; });
 
-/* ---------- Football (verified 2026 schedule) ---------- */
-export const FOOTBALL_SCHEDULE = [
-  { kickoff: '2026-09-05T18:00:00', opponent: 'Abilene Christian', homeAway: 'home', venue: 'Galaxy Stadium', buildingId: 'jones-att-stadium', result: 'W 33-10' },
-  { kickoff: '2026-09-12T18:30:00', opponent: 'Oregon State', homeAway: 'away', venue: 'Reser Stadium', buildingId: null, result: 'W 35-24' },
-  { kickoff: '2026-09-18T19:00:00', opponent: 'Houston', homeAway: 'home', venue: 'Galaxy Stadium', buildingId: 'jones-att-stadium', result: 'W 28-26' },
-  { kickoff: '2026-09-26T12:00:00', opponent: 'Sam Houston', homeAway: 'home', venue: 'Galaxy Stadium', buildingId: 'jones-att-stadium', result: 'W 49-14' },
-  { kickoff: '2026-10-03T12:00:00', opponent: 'Colorado', homeAway: 'away', venue: 'Folsom Field', buildingId: null, result: 'W 29-7' },
-  { kickoff: '2026-10-17T14:30:00', opponent: 'Arizona State', homeAway: 'home', venue: 'Galaxy Stadium', buildingId: 'jones-att-stadium', result: null },
-  // A kickoff at exactly 00:00 means "time not announced yet" (shown as "Time TBA").
-  { kickoff: '2026-10-24T00:00:00', opponent: 'Cincinnati', homeAway: 'away', venue: 'Nippert Stadium', buildingId: null, result: null },
-  { kickoff: '2026-10-31T00:00:00', opponent: 'Arizona', homeAway: 'home', venue: 'Galaxy Stadium', buildingId: 'jones-att-stadium', result: null },
-  { kickoff: '2026-11-07T00:00:00', opponent: 'West Virginia', homeAway: 'home', venue: 'Galaxy Stadium', buildingId: 'jones-att-stadium', result: null },
-  { kickoff: '2026-11-14T00:00:00', opponent: 'Oklahoma State', homeAway: 'away', venue: 'Boone Pickens Stadium', buildingId: null, result: null },
-  { kickoff: '2026-11-21T00:00:00', opponent: 'Baylor', homeAway: 'away', venue: 'McLane Stadium', buildingId: null, result: null },
-  { kickoff: '2026-11-26T19:00:00', opponent: 'TCU', homeAway: 'home', venue: 'Galaxy Stadium', buildingId: 'jones-att-stadium', result: null },
-];
-/* After each game, add its score to `result` (e.g. 'W 31-17') and fill in
+/* ---------- Football ----------
+   The schedule lives in functions/src/shared/football.json so the app
+   and the server (game-day check-ins) read the same thing. After each
+   game, add its score to `result` there (e.g. "W 31-17") and fill in
    any "Time TBA" kickoff once it's announced. Source of truth:
    https://texastech.com/sports/football/schedule */
+export const FOOTBALL_SCHEDULE = FOOTBALL.games;
 const isTba = (g) => { const d = new Date(g.kickoff); return d.getHours() === 0 && d.getMinutes() === 0; };
 // A game with no announced time counts as "next" until the end of its day.
 const endsAt = (g) => (isTba(g) ? new Date(g.kickoff).getTime() + 24 * 3600000 : new Date(g.kickoff).getTime());

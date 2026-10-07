@@ -4,16 +4,18 @@ rules_version = '2';
 // goes through Cloud Functions, which enforce the social rules.
 service cloud.firestore {
   match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function me(uid) { return signedIn() && request.auth.uid == uid; }
 
     // My own profile (handle, plus, canvasConnected).
     match /users/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
+      allow read: if me(uid);
       allow write: if false;
 
       // My friends list, incoming requests, and block list — mine only.
-      match /friends/{other} { allow read: if request.auth != null && request.auth.uid == uid; allow write: if false; }
-      match /requests/{other} { allow read: if request.auth != null && request.auth.uid == uid; allow write: if false; }
-      match /blocked/{other} { allow read: if request.auth != null && request.auth.uid == uid; allow write: if false; }
+      match /friends/{other} { allow read: if me(uid); allow write: if false; }
+      match /requests/{other} { allow read: if me(uid); allow write: if false; }
+      match /blocked/{other} { allow read: if me(uid); allow write: if false; }
     }
 
     // A location doc is readable only by its owner and the friends
@@ -21,14 +23,59 @@ service cloud.firestore {
     // immediately. Expired shares are deleted every 10 minutes by the
     // cleanupExpiredLocations function and hidden by the app sooner.
     match /locations/{uid} {
-      allow read: if request.auth != null && (
-        request.auth.uid == uid || request.auth.uid in resource.data.allowed
-      );
+      allow read: if signedIn() && (request.auth.uid == uid || request.auth.uid in resource.data.allowed);
       allow write: if false;
     }
 
-    // Everything else is server-only: cache, usage counters, tokens,
-    // classmates index, handles, school requests, sponsors.
+    // Shared schedules. "busy" readers can read only /schedules (free/
+    // busy blocks); only "full" readers are on /schedulesFull.
+    match /schedules/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || request.auth.uid in resource.data.readers);
+      allow write: if false;
+    }
+    match /schedulesFull/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || request.auth.uid in resource.data.readers);
+      allow write: if false;
+    }
+
+    // My flight score and stamps — mine only. Friends see totals only
+    // through getFlightBoard, and only if I opted in.
+    match /flight/{uid} {
+      allow read: if me(uid);
+      allow write: if false;
+    }
+
+    // Public building ratings (averages appear only after 5 ratings).
+    match /placeRatings/{placeId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    // Meetups: only the people invited.
+    match /meetups/{id} {
+      allow read: if signedIn() && request.auth.uid in resource.data.members;
+      allow write: if false;
+    }
+
+    // Chats (friend DMs + flocks) and their messages: members only.
+    match /chats/{chatId} {
+      allow read: if signedIn() && request.auth.uid in resource.data.members;
+      allow write: if false;
+      match /messages/{msgId} {
+        allow read: if signedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.members;
+        allow write: if false;
+      }
+    }
+
+    // My nearby-alert settings — mine only (positions are server-side).
+    match /nearby/{uid} {
+      allow read: if me(uid);
+      allow write: if false;
+    }
+
+    // Everything else is server-only: cache, usage counters, push
+    // tokens, friend codes, classmates index, handles, ratings detail,
+    // reports, school requests, sponsors.
     match /{document=**} {
       allow read, write: if false;
     }

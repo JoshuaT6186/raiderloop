@@ -49,6 +49,7 @@ export default function ClassForm({ existing, onSave, onRemove, onClose }) {
   const [endTime, setEndTime] = useState(existing?.endTime || '');
   const [buildingId, setBuildingId] = useState(existing?.buildingId || null);
   const [room, setRoom] = useState(existing?.room || '');
+  const [section, setSection] = useState(existing?.section || '');
   const [q, setQ] = useState('');
   const [error, setError] = useState(null);
 
@@ -69,7 +70,7 @@ export default function ClassForm({ existing, onSave, onRemove, onClose }) {
     if (e <= s) return setError('The class has to end after it starts.');
     if (!buildingId) return setError('Pick the building from the list so directions work.');
     onSave({
-      ...(existing || {}), title: title.trim().toUpperCase().replace(/\s+/g, ' '), days, time, endTime, buildingId, room: room.trim(),
+      ...(existing || {}), title: title.trim().toUpperCase().replace(/\s+/g, ' '), days, time, endTime, buildingId, room: room.trim(), section: section.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6),
       place: `${buildingById(buildingId)?.name || ''}${room.trim() ? ` ${room.trim()}` : ''}`, type: 'class',
     });
   };
@@ -103,6 +104,7 @@ export default function ClassForm({ existing, onSave, onRemove, onClose }) {
         </View>
       )}
       <Field label="Room (optional)" placeholder="e.g. 00077" value={room} onChangeText={setRoom} style={{ marginTop: 12 }} />
+      <Field label="Section (optional)" placeholder="e.g. 012 — matches you with your exact section" value={section} onChangeText={setSection} autoCapitalize="characters" maxLength={6} />
     </Sheet>
   );
 }

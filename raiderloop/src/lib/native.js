@@ -42,6 +42,11 @@ export const MobileAds = Platform.OS === 'web' ? null : tryRequire(() => require
 export const Tracking = Platform.OS === 'ios' ? tryRequire(() => require('expo-tracking-transparency')) : null;
 export const Purchases = Platform.OS === 'web' ? null : tryRequire(() => require('react-native-purchases').default);
 export const AppleTargets = Platform.OS === 'ios' ? tryRequire(() => require('@bacons/apple-targets')) : null;
+export const Camera = Platform.OS === 'web' ? null : tryRequire(() => require('expo-camera'));
+export const TaskManager = Platform.OS === 'web' ? null : tryRequire(() => require('expo-task-manager'));
+export const QRCode = tryRequire(() => require('react-native-qrcode-svg').default);
+export const Constants = tryRequire(() => require('expo-constants').default);
+export const ImageManipulator = tryRequire(() => require('expo-image-manipulator'));
 
 export function tap(kind = 'light') {
   if (!Haptics) return;

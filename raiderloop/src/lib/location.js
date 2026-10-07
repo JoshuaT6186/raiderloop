@@ -3,8 +3,10 @@
  * ------------------------------------------------------------
  *  • Off by default. Turning it on is an explicit choice.
  *  • Friends only, and only the specific friends you pick.
- *  • Foreground only: location is sent while Flyer is open, never in
- *    the background. No "Always" permission is ever requested.
+ *  • Foreground only: live sharing sends location while Flyer is
+ *    open, never in the background. (The separate, opt-in Nearby
+ *    alerts feature in lib/nearby.js is the only background use, and
+ *    it never shows anyone a location.)
  *  • Approximate by default (~100 m); precise is a separate toggle.
  *  • Timed: 1 hour, until tonight, or until you turn it off.
  *  • Campus-only option: nothing is sent when you're off campus.

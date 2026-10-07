@@ -15,6 +15,8 @@ import { metaLine } from '../lib/time';
 import {
   buildingById, catLabel, walkLabel, floorPlanFor, ORGS, DINING, BUS_STOPS, RESOURCES, isGreek,
 } from '../data/campus';
+import { placeById } from '../data/places';
+import { CheckInCard, RatingSummary, useCheckIn } from './PlaceExtras';
 
 function HoursTable({ spec }) {
   const { t } = useTheme();
@@ -39,11 +41,18 @@ export function OpenBadge({ spec }) {
 }
 
 /* ---------- Event ---------- */
+function eventLive(ev, now = Date.now()) {
+  const s = ev.startsAt ? Date.parse(ev.startsAt) : NaN;
+  return Number.isFinite(s) && now >= s - 30 * 60000 && now <= s + 3 * 3600000;
+}
+
 export function EventSheet({ ev, onClose }) {
   const { t } = useTheme();
-  const { isSaved, toggleSave, addEventToSchedule } = useApp();
+  const { isSaved, toggleSave, addEventToSchedule, setSheet } = useApp();
+  const { busy, run } = useCheckIn();
   const saved = isSaved(ev.id);
   const b = ev.buildingId ? buildingById(ev.buildingId) : null;
+  const live = eventLive(ev);
   return (
     <Sheet title={ev.title} hand={metaLine(ev.org, ev.date, ev.time)} onClose={onClose}
       footer={(
@@ -57,8 +66,15 @@ export function EventSheet({ ev, onClose }) {
         <PT kind="body">{ev.desc || 'No description was posted for this one.'}</PT>
         {ev.location || b ? <PT kind="small" style={{ marginTop: 8 }}>📍 {ev.location || b?.name}</PT> : null}
       </PostIt>
+      {live ? (
+        <PostIt color="green" seed={`live-${ev.id}`} style={{ marginTop: 14 }}>
+          <PT kind="bold">Happening now — check in for +25 flight score</PT>
+          <Button title="I'm here" icon="check" small loading={busy} onPress={() => run({ eventId: ev.id })} style={{ marginTop: 8, alignSelf: 'flex-start' }} />
+        </PostIt>
+      ) : null}
       <View style={{ marginTop: 16 }}>
         {b ? <Row title="Walking directions" meta={metaLine(b.name, walkLabel(b))} left={<Icon name="walk" color={t.ink} />} onPress={() => openDirections(b)} /> : null}
+        <Row title="Send to a friend in Flyer" meta="As a card in a chat" left={<Icon name="chat" color={t.ink} />} onPress={() => setSheet({ type: 'shareCard', card: { type: 'event', title: ev.title, date: ev.date, time: ev.time, location: ev.location || b?.name || '', sourceUrl: ev.sourceUrl || null } })} />
         {ev.sourceUrl ? <Row title="Original listing" meta="Opens the source page" left={<Icon name="link" color={t.ink} />} onPress={() => openUrl(ev.sourceUrl)} /> : null}
         <Row title="Send to a friend" left={<Icon name="share" color={t.ink} />} onPress={() => shareText(`${ev.title} — ${metaLine(ev.date, ev.time, ev.location || b?.name)} (via Flyer)`)} last />
       </View>
@@ -110,6 +126,14 @@ export function BuildingSheet({ id, onClose }) {
       <View style={{ flexDirection: 'row', marginBottom: 6 }}><OpenBadge spec={b.hours} /></View>
       {b.hours ? <HoursTable spec={b.hours} /> : <T kind="small">No posted hours for this building.</T>}
 
+      <CheckInCard placeId={b.id} />
+      {placeById(b.id) ? (
+        <View style={{ marginTop: 14 }}>
+          <T kind="tiny" style={{ marginBottom: 6 }}>{placeById(b.id).tier === 'dining' ? 'Food ratings' : 'Study ratings'}</T>
+          <RatingSummary placeId={b.id} />
+        </View>
+      ) : null}
+
       {myClasses.length ? (
         <PostIt color="yellow" seed={`${b.id}-mine`} style={{ marginTop: 16 }}>
           <PT kind="tiny">Your classes here</PT>
@@ -122,6 +146,8 @@ export function BuildingSheet({ id, onClose }) {
         {dining.map((d) => <Row key={d.id} title={d.name} meta="Dining inside" left={<Icon name="food" color={t.ink} />} onPress={() => setSheet({ type: 'dining', id: d.id })} />)}
         {resources.map((r) => <Row key={r.id} title={r.name} meta={r.kind} left={<Icon name="help" color={t.ink} />} onPress={r.url ? () => openUrl(r.url) : undefined} />)}
         {stops.map((s) => <Row key={s.id} title={`Citibus stop: ${s.name}`} meta={`${s.route} route`} left={<Icon name="bus" color={t.ink} />} />)}
+        {placeById(b.id) ? <Row title="Plan a meetup here" meta="Send a friend a meetup card" left={<Icon name="users" color={t.ink} />} onPress={() => setSheet({ type: 'meetupNew', placeId: b.id })} /> : null}
+        <Row title="Send this place to a friend" left={<Icon name="chat" color={t.ink} />} onPress={() => setSheet({ type: 'shareCard', card: { type: 'place', placeId: b.id, name: b.name } })} last />
       </View>
     </Sheet>
   );

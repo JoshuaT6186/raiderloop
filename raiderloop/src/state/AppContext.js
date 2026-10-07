@@ -9,7 +9,9 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AsyncStorage } from '../lib/native';
 import { APP } from '../config';
-import { onAuth, listenMyProfile, listenFriends, listenRequests, listenFriendLocations } from '../lib/firebase';
+import {
+  onAuth, listenMyProfile, listenFriends, listenRequests, listenFriendLocations, listenBlocked, listenFlight, listenMeetups, listenChats,
+} from '../lib/firebase';
 import { sortByTime, todayCode, overlaps, uid } from '../lib/time';
 import { buildingById } from '../data/campus';
 import { DEFAULT_AVATAR } from '../ui/avatarParts';
@@ -43,6 +45,11 @@ const DEFAULTS = {
   pilotDay: '',
   dismissedTips: [],
   canvasCourses: [], // { name, score } from Canvas sync
+  scheduleShare: { levels: {} }, // friendUid → 'busy' | 'full' (absent = off)
+  nearby: { on: false, allow: [] }, // nearby-friend alerts (mutual opt-in)
+  chatRead: {}, // chatId → ms of the last message I've seen
+  sentRequests: [], // uids I've sent friend requests to (for "Requested")
+  hiddenMsgs: [], // message ids I reported/hid
 };
 const PERSIST_KEYS = Object.keys(DEFAULTS).filter((k) => k !== 'onboardStep');
 
@@ -54,6 +61,11 @@ export function AppProvider({ children }) {
   const [friends, setFriends] = useState([]);
   const [requests, setRequests] = useState([]);
   const [friendLocations, setFriendLocations] = useState([]);
+  const [friendsLoaded, setFriendsLoaded] = useState(false);
+  const [blocked, setBlocked] = useState([]);
+  const [flight, setFlight] = useState({});
+  const [meetups, setMeetups] = useState([]);
+  const [chats, setChats] = useState([]);
 
   // Ephemeral UI state
   const [tab, setTab] = useState('home');
@@ -77,6 +89,8 @@ export function AppProvider({ children }) {
             for (const k of PERSIST_KEYS) if (data[k] !== undefined) next[k] = data[k];
             next.notif = { ...DEFAULTS.notif, ...(data.notif || {}) };
             next.sharing = { ...DEFAULTS.sharing, ...(data.sharing || {}) };
+            next.scheduleShare = { ...DEFAULTS.scheduleShare, ...(data.scheduleShare || {}) };
+            next.nearby = { ...DEFAULTS.nearby, ...(data.nearby || {}) };
             next.avatar = { ...DEFAULT_AVATAR, ...(data.avatar || {}) };
             if (!next.onboarded && data.onboardStep) next.onboardStep = data.onboardStep;
             setState(next);
@@ -105,12 +119,20 @@ export function AppProvider({ children }) {
   }, [user]);
   useEffect(() => {
     if (!user || user.isAnonymous) { setFriends([]); setRequests([]); setFriendLocations([]); return undefined; }
-    const a = listenFriends(user.uid, setFriends);
+    setFriendsLoaded(false);
+    const a = listenFriends(user.uid, (list, ok) => { setFriends(list); if (ok) setFriendsLoaded(true); });
     const b = listenRequests(user.uid, setRequests);
     /* Only fresh, unexpired locations from people who are still my
        friends are shown — a stale or revoked doc is simply hidden. */
     const c = listenFriendLocations(user.uid, (locs) => setFriendLocations(locs.filter((l) => !l.until || new Date(l.until) > new Date())));
-    return () => { a(); b(); c(); };
+    const d = listenBlocked(user.uid, setBlocked);
+    const e = listenFlight(user.uid, setFlight);
+    const g = listenMeetups(user.uid, setMeetups);
+    const h = listenChats(user.uid, setChats);
+    return () => { a(); b(); c(); d(); e(); g(); h(); };
+  }, [user]);
+  useEffect(() => {
+    if (!user || user.isAnonymous) { setBlocked([]); setFlight({}); setMeetups([]); setChats([]); }
   }, [user]);
 
   const set = (patch) => setState((p) => ({ ...p, ...(typeof patch === 'function' ? patch(p) : patch) }));
@@ -171,6 +193,10 @@ export function AppProvider({ children }) {
      flow can be re-tested honestly from the very first screen. */
   const resetAll = () => { setState({ ...DEFAULTS }); setTab('home'); setSheet(null); };
 
+  const markChatRead = (chatId, ms) => set((p) => ({ chatRead: { ...p.chatRead, [chatId]: Math.max(ms || Date.now(), p.chatRead[chatId] || 0) } }));
+  const unreadChats = chats.filter((c) => c.last && c.last.from && c.last.from !== user?.uid && (c.last.atMs || 0) > (state.chatRead[c.id] || 0)).length;
+  const pendingMeetups = meetups.filter((m) => m.status && user && m.status[user.uid] === 'invited').length;
+
   const value = useMemo(() => ({
     ...state, set, hydrated, user, profile, friends, requests,
     friendLocations: friendLocations.filter((l) => friends.some((f) => f.uid === l.uid)),
@@ -179,8 +205,9 @@ export function AppProvider({ children }) {
     addClass, updateClass, removeClass, replaceSchedule, addEventToSchedule,
     addAssignment, updateAssignment, removeAssignment, mergeCanvasAssignments,
     isSaved, toggleSave, toggleFollow, goToBuilding, notePilotUse, resetAll,
+    blocked, flight, meetups, chats, markChatRead, unreadChats, pendingMeetups, friendsLoaded,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [state, hydrated, user, profile, friends, requests, friendLocations, tab, sheet, pilotOpen, pilotSeed, conflict, toast]);
+  }), [state, hydrated, user, profile, friends, friendsLoaded, requests, friendLocations, blocked, flight, meetups, chats, tab, sheet, pilotOpen, pilotSeed, conflict, toast]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

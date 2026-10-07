@@ -23,6 +23,7 @@ import { buildingById, walkLabel, nextGame, gameDateLabel, floorPlanFor } from '
 import { openDirections, openUrl } from '../lib/links';
 import { BannerAd } from '../lib/monetize';
 import { TERM } from '../config';
+import { MeetupsPeek } from '../sheets/Meetups';
 
 function WeatherNote({ w, nextClass }) {
   if (w.loading) return <PostIt color="blue" seed="wx"><Loading label="Checking the sky…" /></PostIt>;
@@ -197,6 +198,7 @@ export default function Home() {
 
       <Section title={today.length ? `Today · ${today.length} ${today.length === 1 ? 'class' : 'classes'}` : 'Today'} icon="schedule" action="week" onAction={() => setTab('schedule')} />
       <UpNext next={next} now={now} />
+      <MeetupsPeek />
 
       <DueSoon />
 

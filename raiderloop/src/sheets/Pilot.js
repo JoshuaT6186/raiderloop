@@ -12,7 +12,7 @@
  * just shows the user where they stand.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { View, ScrollView, TextInput, Pressable, ActivityIndicator } from 'react-native';
+import { View, ScrollView, TextInput, Pressable, ActivityIndicator, Image, Alert } from 'react-native';
 import { Sheet, T, PostIt, PT, Row, Chip } from '../ui/Paper';
 import Icon from '../ui/Icon';
 import { PlaneMark } from '../ui/Logo';
@@ -29,10 +29,12 @@ import {
 } from '../data/campus';
 import { openUrl } from '../lib/links';
 import { LIMITS, SAFETY } from '../config';
+import { ImagePicker } from '../lib/native';
+import { preparePhoto } from '../lib/photos';
 
 const SUGGESTIONS = [
   'Where is my next class?', "What's due this week?", "What's open to eat right now?",
-  "What's happening tonight?", 'Where can I study late?', 'When is the next game?',
+  "What's happening tonight?", 'Best study spots?', 'When is the next game?',
 ];
 
 const FIXED = [
@@ -70,6 +72,7 @@ export default function Pilot({ onClose }) {
   const weather = useWeather(schoolId);
   const [input, setInput] = useState('');
   const [thread, setThread] = useState([]);
+  const [photo, setPhoto] = useState(null);
   const scroller = useRef(null);
   const usedToday = pilotDay === new Date().toISOString().slice(0, 10) ? pilotUsedToday : 0;
   const limit = isPlus ? LIMITS.pilotPlus : LIMITS.pilotFree;
@@ -103,19 +106,51 @@ export default function Pilot({ onClose }) {
       return { text: g ? `${g.homeAway === 'home' ? 'Home vs.' : 'Away at'} ${g.opponent} — ${gameDateLabel(g.kickoff)} at ${g.venue}.` : 'Football season is over.' };
     }
     if (/saved|bookmark/.test(low)) return { text: savedEvents.length ? `You have ${savedEvents.length} saved ${savedEvents.length === 1 ? 'event' : 'events'} — they're in You.` : 'Nothing saved yet.', tab: 'you' };
-    if (/study|quiet|library/.test(low)) return { text: 'Good study spots:', buildingIds: ['texas-tech-university-library', 'student-union'] };
     return null;
   };
 
+  /* Study spots: real ratings from students who checked in, when there
+     are enough of them; otherwise the two obvious places. */
+  const studySpots = async () => {
+    try {
+      const r = await api.getTopRated({ category: 'study' });
+      const top = (r.data.places || []).slice(0, 4);
+      if (top.length) return { text: `Top-rated study spots on Flyer (from students who checked in):\n${top.map((x) => `• ${x.name} — ${x.overall}★ (quiet ${x.quiet}, outlets ${x.outlets})`).join('\n')}`, buildingIds: top.map((x) => x.id) };
+    } catch (e) { /* fall through */ }
+    return { text: 'Not enough ratings yet to rank study spots — these are good bets. Check in and rate them to help!', buildingIds: ['texas-tech-university-library', 'student-union'] };
+  };
+
+  const pickPhoto = () => {
+    if (!ImagePicker) { setThread((p) => [...p, { role: 'p', hit: { text: 'Photo questions need the full app build.' } }]); return; }
+    const go = async (camera) => {
+      const perm = camera ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) return;
+      const opts = { quality: 0.8, mediaTypes: ['images'] };
+      const res = camera ? await ImagePicker.launchCameraAsync(opts) : await ImagePicker.launchImageLibraryAsync(opts);
+      if (res.canceled || !res.assets?.[0]) return;
+      const a = await preparePhoto(res.assets[0], { base64: true }).catch(() => null);
+      if (!a || !a.base64) return;
+      setPhoto({ uri: a.uri, base64: a.base64, mediaType: a.mimeType });
+    };
+    Alert.alert('Ask about a photo', 'Notes, a worksheet, a whiteboard — Pilot explains it step by step.', [
+      { text: 'Take photo', onPress: () => go(true) },
+      { text: 'Choose photo', onPress: () => go(false) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
   const ask = async (text) => {
-    const q = (text || input).trim();
+    const img = photo;
+    const q = (text || input).trim() || (img ? 'Help me understand this.' : '');
     if (!q) return;
     const low = q.toLowerCase();
     setInput('');
-    setThread((p) => [...p, { role: 'u', text: q }]);
-    const l = local(low);
+    setPhoto(null);
+    setThread((p) => [...p, { role: 'u', text: q, uri: img?.uri }]);
+    if (!img && /study spot|where.*study|study late|quiet place|library/.test(low)) { const hit = await studySpots(); setThread((p) => [...p, { role: 'p', hit }]); return; }
+    const l = img ? null : local(low);
     if (l) { setThread((p) => [...p, { role: 'p', hit: l }]); return; }
-    const fixed = FIXED.find((r) => r.match.some((m) => low.includes(m)));
+    const fixed = img ? null : FIXED.find((r) => r.match.some((m) => low.includes(m)));
     if (fixed) { setThread((p) => [...p, { role: 'p', hit: fixed }]); return; }
     if (usedToday >= limit) {
       setThread((p) => [...p, { role: 'p', hit: { text: isPlus ? "You've hit today's question limit — it resets at midnight." : `That's all ${limit} free questions for today. They reset at midnight, or Flyer Plus gives you ${LIMITS.pilotPlus} a day.`, plus: !isPlus } }]);
@@ -124,7 +159,11 @@ export default function Pilot({ onClose }) {
     const id = `pending-${Date.now()}`;
     setThread((p) => [...p, { role: 'p', pending: true, id }]);
     try {
-      const res = await api.askPilot({ question: q, context: buildContext({ ...app, weather }), history: thread.slice(-6).filter((m) => !m.pending).map((m) => ({ role: m.role === 'u' ? 'user' : 'assistant', text: m.text || m.hit?.text || '' })) });
+      const res = await api.askPilot({
+        question: q, context: buildContext({ ...app, weather }),
+        history: thread.slice(-6).filter((m) => !m.pending).map((m) => ({ role: m.role === 'u' ? 'user' : 'assistant', text: m.text || m.hit?.text || '' })),
+        image: img ? { base64: img.base64, mediaType: img.mediaType } : undefined,
+      });
       notePilotUse();
       const reply = (res?.data?.text || '').trim() || "I don't have verified information on that.";
       setThread((p) => p.map((m) => (m.id === id ? { role: 'p', hit: { text: reply, sources: res?.data?.sources || [] } } : m)));
@@ -142,13 +181,23 @@ export default function Pilot({ onClose }) {
       headerRight={<View style={{ marginRight: 4 }}><PlaneMark size={34} trail={false} /></View>}
       footer={(
         <View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: t.card, borderWidth: 2, borderColor: t.mode === 'dark' ? t.borderStrong : '#1F2A44', borderRadius: 16, paddingLeft: 14, paddingRight: 6, paddingVertical: 6 }}>
-            <TextInput style={{ flex: 1, fontSize: 16, color: t.ink, paddingVertical: 6 }} placeholder="Ask Pilot…" placeholderTextColor={t.faint} value={input} onChangeText={setInput} onSubmitEditing={() => ask()} returnKeyType="send" maxLength={500} />
+          {photo ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+              <Image source={{ uri: photo.uri }} style={{ width: 54, height: 54, borderRadius: 8, borderWidth: 1.5, borderColor: '#1F2A44' }} />
+              <T kind="small" style={{ flex: 1, marginLeft: 10 }}>Photo attached — ask about it, or just send.</T>
+              <Pressable onPress={() => setPhoto(null)} hitSlop={10} accessibilityLabel="Remove photo"><Icon name="close" color={t.ink} /></Pressable>
+            </View>
+          ) : null}
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: t.card, borderWidth: 2, borderColor: t.mode === 'dark' ? t.borderStrong : '#1F2A44', borderRadius: 16, paddingLeft: 6, paddingRight: 6, paddingVertical: 6 }}>
+            <Pressable onPress={pickPhoto} accessibilityLabel="Ask about a photo" style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginRight: 6 }}>
+              <Icon name="camera" size={20} color={t.ink} />
+            </Pressable>
+            <TextInput style={{ flex: 1, fontSize: 16, color: t.ink, paddingVertical: 6 }} placeholder={photo ? 'What do you want to know?' : 'Ask Pilot…'} placeholderTextColor={t.faint} value={input} onChangeText={setInput} onSubmitEditing={() => ask()} returnKeyType="send" maxLength={500} />
             <Pressable onPress={() => ask()} accessibilityLabel="Send" style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: t.highlight, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#1F2A44' }}>
               <Icon name="send" size={18} color="#1F2A44" />
             </Pressable>
           </View>
-          <T kind="small" style={{ fontSize: 11, marginTop: 6, textAlign: 'center' }}>{Math.max(0, limit - usedToday)} live answers left today · Pilot can be wrong — check official sources for deadlines.</T>
+          <T kind="small" style={{ fontSize: 11, marginTop: 6, textAlign: 'center' }}>{Math.max(0, limit - usedToday)} live answers left today · Photo help explains steps, it won't just hand you answers · Pilot can be wrong.</T>
         </View>
       )}>
       <ScrollView ref={scroller} style={{ height: 420 }} contentContainerStyle={{ paddingBottom: 10 }} keyboardShouldPersistTaps="handled">
@@ -160,8 +209,11 @@ export default function Pilot({ onClose }) {
             </View>
           </View>
         ) : thread.map((m, i) => (m.role === 'u' ? (
-          <View key={i} style={{ alignSelf: 'flex-end', maxWidth: '82%', backgroundColor: t.accent, borderRadius: 14, borderBottomRightRadius: 4, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 10 }}>
-            <T color={t.accentInk}>{m.text}</T>
+          <View key={i} style={{ alignSelf: 'flex-end', maxWidth: '82%', marginBottom: 10, alignItems: 'flex-end' }}>
+            {m.uri ? <Image source={{ uri: m.uri }} style={{ width: 160, height: 160, borderRadius: 10, marginBottom: 4 }} /> : null}
+            <View style={{ backgroundColor: t.accent, borderRadius: 14, borderBottomRightRadius: 4, paddingHorizontal: 12, paddingVertical: 8 }}>
+              <T color={t.accentInk}>{m.text}</T>
+            </View>
           </View>
         ) : m.pending ? (
           <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
