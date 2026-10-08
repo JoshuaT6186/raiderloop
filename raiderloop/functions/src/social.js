@@ -413,6 +413,18 @@ const INACTIVE = ['EXPIRATION'];
 exports.revenuecatWebhook = onRequest({ secrets: [REVENUECAT_WEBHOOK_AUTH] }, async (req, res) => {
   if (req.get('Authorization') !== REVENUECAT_WEBHOOK_AUTH.value()) { res.status(401).send('no'); return; }
   const ev = req.body && req.body.event;
+  // Moving a purchase to another account (restore on a new login) has no
+  // app_user_id: the new owner gets Plus, the old one loses it.
+  if (ev && ev.type === 'TRANSFER') {
+    const real = (ids) => (Array.isArray(ids) ? ids : []).filter((id) => id && !String(id).startsWith('$RCAnonymousID'));
+    for (const [ids, value] of [[real(ev.transferred_from), false], [real(ev.transferred_to), true]]) {
+      for (const id of ids) {
+        await db.doc(`users/${id}`).set({ plus: value, plusUpdatedAt: FieldValue.serverTimestamp() }, { merge: true });
+        await getAuth().setCustomUserClaims(id, { plus: value }).catch(() => {});
+      }
+    }
+    res.status(200).send('ok'); return;
+  }
   if (!ev || !ev.app_user_id || ev.app_user_id.startsWith('$RCAnonymousID')) { res.status(200).send('ignored'); return; }
   let plus = null;
   if (ACTIVE.includes(ev.type)) plus = true;

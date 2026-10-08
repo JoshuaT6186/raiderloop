@@ -66,12 +66,15 @@ export async function initPurchases(appUserId) {
 }
 export const purchasesAvailable = () => !!Purchases && purchasesReady;
 
+/* true / false when RevenueCat answered; null when it couldn't (offline,
+   not configured). The caller keeps the saved value on null, so someone
+   who paid isn't shown ads just because the network blipped. */
 export async function checkPlus() {
-  if (!purchasesAvailable()) return false;
+  if (!purchasesAvailable()) return null;
   try {
     const info = await Purchases.getCustomerInfo();
     return !!info.entitlements.active[PURCHASES.entitlement];
-  } catch (e) { return false; }
+  } catch (e) { return null; }
 }
 
 export async function getPlusOffering() {
@@ -98,7 +101,7 @@ export function usePlusStatus(user, onChange) {
     (async () => {
       await initPurchases(user && !user.isAnonymous ? user.uid : null);
       const plus = await checkPlus();
-      if (!cancelled) onChange(plus);
+      if (!cancelled && plus !== null) onChange(plus);
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -14,7 +14,7 @@ import { expiryFor, getForegroundPermission, sharingActive } from '../lib/locati
 import { emailSignUp, appleSignIn } from '../lib/firebase';
 import { AppleAuth, Crypto } from '../lib/native';
 import { getPlusOffering, buyPlus, restorePlus, purchasesAvailable } from '../lib/monetize';
-import { LIMITS, PURCHASES } from '../config';
+import { APP, LIMITS, PURCHASES } from '../config';
 
 /* ---------- Gameday ---------- */
 export function GamedaySheet({ kickoff, onClose }) {
@@ -66,31 +66,54 @@ export function GamedaySheet({ kickoff, onClose }) {
 /* ---------- Flyer Plus ---------- */
 export function PlusSheet({ onClose }) {
   const { t } = useTheme();
-  const { set, showToast } = useApp();
+  const { set, showToast, user, setSheet } = useApp();
   const [offering, setOffering] = useState(undefined);
   const [busy, setBusy] = useState(false);
   useEffect(() => { getPlusOffering().then(setOffering); }, []);
   const pkg = offering?.monthly || offering?.availablePackages?.[0];
+  const hasAccount = !!user && !user.isAnonymous;
+  const price = pkg ? `${pkg.product.priceString}/month` : PURCHASES.priceHint.replace('/mo', '/month');
   const perks = [
     ['tag', 'No ads, anywhere'],
     ['plane', `${LIMITS.pilotPlus} Pilot questions a day (instead of ${LIMITS.pilotFree})`],
     ['star', 'Extra avatar gear: grad cap, jersey'],
     ['heart', 'Keeps a student-built app running'],
   ];
+  const buy = async () => {
+    setBusy(true);
+    try { if (await buyPlus(pkg)) { set({ isPlus: true }); showToast('Welcome to Plus!'); onClose(); } } catch (e) { if (!e.userCancelled) showToast(e.message); }
+    setBusy(false);
+  };
+  const restore = async () => {
+    try { const ok = await restorePlus(); set({ isPlus: ok }); showToast(ok ? 'Plus restored' : 'No purchase found'); } catch (e) { showToast(e.message); }
+  };
   return (
     <Sheet title="Flyer Plus" hand="Everything stays free. Plus is a thank-you with perks." onClose={onClose}
       footer={(
         <View>
-          {!purchasesAvailable() ? <T kind="small" style={{ marginBottom: 8 }}>Purchases aren't set up in this build yet.</T> : null}
-          <Button title={pkg ? `Get Plus · ${pkg.product.priceString}/mo` : `Get Plus · ${PURCHASES.priceHint}`} icon="crown" kind="highlight" loading={busy} disabled={!pkg}
-            onPress={async () => { setBusy(true); try { if (await buyPlus(pkg)) { set({ isPlus: true }); showToast('Welcome to Plus!'); onClose(); } } catch (e) { if (!e.userCancelled) showToast(e.message); } setBusy(false); }} />
-          <Pressable onPress={async () => { try { const ok = await restorePlus(); set({ isPlus: ok }); showToast(ok ? 'Plus restored' : 'No purchase found'); } catch (e) { showToast(e.message); } }} style={{ alignItems: 'center', marginTop: 12 }}>
+          {!purchasesAvailable() ? <T kind="small" style={{ marginBottom: 8 }}>Purchases aren't available right now. Check your connection and reopen this screen.</T> : null}
+          {hasAccount ? (
+            <Button title={pkg ? `Get Plus · ${price}` : 'Get Plus'} icon="crown" kind="highlight" loading={busy || (purchasesAvailable() && offering === undefined)} disabled={!pkg} onPress={buy} />
+          ) : (
+            <>
+              <T kind="small" style={{ marginBottom: 8 }}>Plus is tied to your account so it follows you to a new phone. Make a free account first.</T>
+              <Button title="Make a free account" icon="userPlus" kind="highlight" onPress={() => { onClose(); setSheet({ type: 'account' }); }} />
+            </>
+          )}
+          <Pressable onPress={restore} accessibilityRole="button" style={{ alignItems: 'center', marginTop: 12 }}>
             <T kind="hand" color={t.pencil}>restore purchase</T>
           </Pressable>
-          <T kind="small" style={{ fontSize: 11, textAlign: 'center', marginTop: 6 }}>Renews monthly until canceled in your App Store settings.</T>
+          <T kind="small" style={{ fontSize: 11, textAlign: 'center', marginTop: 6 }}>
+            Flyer Plus is a monthly auto-renewing subscription{pkg ? ` at ${price}` : ''}. Payment is charged to your Apple ID when you confirm. It renews automatically unless you cancel at least 24 hours before the end of the current period. Manage or cancel any time in your App Store account settings.
+          </T>
+          <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 6 }}>
+            <Pressable onPress={() => openUrl(APP.termsUrl)} hitSlop={8} accessibilityRole="link"><T kind="small" color={t.accent} style={{ fontSize: 12 }}>Terms of Use</T></Pressable>
+            <T kind="small" style={{ fontSize: 12, marginHorizontal: 8 }}>·</T>
+            <Pressable onPress={() => openUrl(APP.privacyUrl)} hitSlop={8} accessibilityRole="link"><T kind="small" color={t.accent} style={{ fontSize: 12 }}>Privacy Policy</T></Pressable>
+          </View>
         </View>
       )}>
-      {offering === undefined ? <Loading /> : null}
+      {offering === undefined && purchasesAvailable() ? <Loading /> : null}
       <PostIt color="yellow" tilt={-1.2} tape padding={18}>
         {perks.map(([icon, label]) => (
           <View key={label} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6 }}>

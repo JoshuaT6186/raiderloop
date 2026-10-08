@@ -43,7 +43,7 @@ ASK PILOT
 
 Flyer is an independent, student-built app and is not affiliated with, endorsed by, or sponsored by any university.
 
-Flyer Plus (optional subscription): no ads, more Pilot questions a day, and extra avatar gear. Payment is charged to your Apple ID and renews unless canceled at least 24 hours before the period ends. Manage it in your App Store account settings.
+Flyer Plus (optional monthly subscription, $4.99/month): no ads, more Pilot questions a day, and extra avatar gear. Payment is charged to your Apple ID at confirmation and renews automatically unless canceled at least 24 hours before the end of the current period. Manage or cancel it in your App Store account settings.
 Terms: [your terms URL] · Privacy: [your privacy URL]
 
 **Keywords (100 chars):** college,campus,class schedule,planner,gpa,assignments,student,dining,friends,map,finals,university

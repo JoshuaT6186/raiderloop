@@ -74,8 +74,8 @@ export const SAFETY = {
    release, and set the app IDs in app.json's plugin config too. */
 export const ADS = {
   enabled: true,
-  useTestIds: true,
-  bannerIos: 'ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX',
+  useTestIds: false,
+  bannerIos: 'ca-app-pub-2470651802364867/8064250829',
   bannerAndroid: 'ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX',
   nativeEvery: 6, // one ad slot per N feed items, never more
 };
@@ -85,7 +85,7 @@ export const PURCHASES = {
   iosKey: '', // appl_xxxxxxxxx from RevenueCat
   androidKey: '', // goog_xxxxxxxxx
   entitlement: 'plus',
-  priceHint: '$2.99/mo', // display only; real price comes from the store
+  priceHint: '$4.99/mo', // display only; real price comes from the store
 };
 
 /* Affiliate links. Must be disclosed (FTC) — the UI labels every
