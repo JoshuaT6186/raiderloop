@@ -1,6 +1,6 @@
 /**
  * Permissions are asked here with a plain-English reason first, and
- * every one is optional — declining never blocks onboarding.
+ * every one is optional, and declining never blocks onboarding.
  */
 import React, { useState } from 'react';
 import { View } from 'react-native';
@@ -36,15 +36,19 @@ function Perm({ icon, title, body, state, onAsk, color }) {
   );
 }
 
-export default function Permissions() {
-  const { set } = useApp();
+export default function Permissions({ returning = false }) {
+  const { set, userName } = useApp();
   const [notif, setNotif] = useState(Notifications ? 'ask' : 'denied');
   const [loc, setLoc] = useState(Location ? 'ask' : 'denied');
   const [ads, setAds] = useState(Tracking ? 'ask' : null);
   return (
-    <Shell step="permissions" onBack={() => set({ onboardStep: 'schedule' })}
-      footer={<Button title="Continue" icon="chevronRight" onPress={() => set({ onboardStep: 'tour', adConsentAsked: true })} />}>
-      <Heading eyebrow="step seven" title="A few quick yeses" sub="All optional. You can change any of these later in Settings." />
+    <Shell step={returning ? 'welcomeback' : 'permissions'} onBack={returning ? null : () => set({ onboardStep: 'schedule' })}
+      footer={returning
+        ? <Button title="Take off" icon="plane" onPress={() => set({ onboarded: true, onboardStep: 'welcome', adConsentAsked: true })} />
+        : <Button title="Continue" icon="chevronRight" onPress={() => set({ onboardStep: 'tour', adConsentAsked: true })} />}>
+      {returning
+        ? <Heading eyebrow="welcome back" title={`Good to see you, ${userName || 'friend'}`} sub="Your profile is back. This phone just needs a few quick yeses. All optional, and you can change them later in Settings." />
+        : <Heading eyebrow="step seven" title="A few quick yeses" sub="All optional. You can change any of these later in Settings." />}
       <Perm icon="bell" color="yellow" title="Reminders" state={notif}
         body="A nudge before each class (with rain or cold heads-ups), before assignments are due, and before saved events."
         onAsk={async () => setNotif((await ensureNotificationPermission(true)) ? 'granted' : 'denied')} />

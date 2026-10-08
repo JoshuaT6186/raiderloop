@@ -11,7 +11,7 @@
 export const APP = {
   name: 'Flyer',
   tagline: 'Your campus, folded into one app.',
-  supportEmail: 'support@eternityworks.app', // TODO: replace with a real inbox you check
+  supportEmail: 'eternityworks2026@gmail.com',
   privacyUrl: 'https://YOUR-GITHUB-USERNAME.github.io/flyer/privacy.html', // TODO: host docs/privacy.html
   termsUrl: 'https://YOUR-GITHUB-USERNAME.github.io/flyer/terms.html', // TODO: host docs/terms.html
   disclaimer:
@@ -43,7 +43,6 @@ export const SCHOOLS = [
     active: true,
     tz: 'America/Chicago',
     center: { latitude: 33.58434, longitude: -101.87656 },
-    canvasDomain: 'texastech.instructure.com', // verified: depts.ttu.edu/lms/student-faq.php
   },
 ];
 export const COMING_SOON_NOTE = 'More campuses are on the way. Request yours and we\'ll prioritize the most-requested schools.';
@@ -67,18 +66,6 @@ export const TERM = {
 export const SAFETY = {
   emergency: '911',
   campusPolice: { label: 'Texas Tech Police (non-emergency, 24/7)', phone: '806-742-3931', source: 'https://www.depts.ttu.edu/ttpd/contact.php' },
-};
-
-/* Canvas "Sign in with Canvas" (OAuth2). Requires a Developer Key
-   issued by whoever administers TTU's Canvas instance — only they
-   can create one. Until you have it, leave clientId empty and the
-   app shows manual assignment entry plus a "waiting on approval"
-   card instead of a broken button. The client SECRET never goes in
-   the app; it lives in the CANVAS_CLIENT_SECRET function secret. */
-export const CANVAS = {
-  clientId: '', // e.g. '170000000000123' from the Developer Key
-  redirectScheme: 'flyer',
-  redirectPath: 'canvas-auth',
 };
 
 /* Ads. Starts on Google's official TEST unit IDs so you can never

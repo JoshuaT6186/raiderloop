@@ -25,7 +25,7 @@ function hoursOn(items, d) {
 
 export default function Classes() {
   const { t } = useTheme();
-  const { scheduleItems, addClass, updateClass, removeClass, assignments, showToast } = useApp();
+  const { scheduleItems, addClass, updateClass, removeClass, assignments, showToast, setSheet } = useApp();
   const now = useNow(30000);
   const [day, setDay] = useState(todayCode(now));
   const [form, setForm] = useState(null);
@@ -50,8 +50,19 @@ export default function Classes() {
 
   return (
     <View>
+      {/* syllabus scan: the fastest way to fill the Due tab, so it sits up top */}
+      <PostIt color="green" tilt={-0.6} padding={14} onPress={() => setSheet({ type: 'syllabus' })} accessibilityLabel="Scan a syllabus" style={{ marginTop: 6 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View style={{ flex: 1, paddingRight: 10 }}>
+            <PT kind="title" style={{ fontSize: 18 }}>Scan a syllabus</PT>
+            <PT kind="small">Snap photos or pick a PDF. Every due date lands in your Planner.</PT>
+          </View>
+          <Button title="Scan" icon="scan" small onPress={() => setSheet({ type: 'syllabus' })} />
+        </View>
+      </PostIt>
+
       {/* week strip */}
-      <Card style={{ marginTop: 6 }}>
+      <Card style={{ marginTop: 14 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: 104 }}>
           {WEEK_DAYS.map((d) => {
             const h = hoursOn(classes, d); const n = itemsOnDay(classes, d).length; const on = d === day;

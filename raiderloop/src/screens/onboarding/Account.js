@@ -5,7 +5,8 @@ import { useTheme } from '../../theme/ThemeContext';
 import { T, Button, Field, Card, Divider } from '../../ui/Paper';
 import Icon from '../../ui/Icon';
 import { Shell, Heading } from './Shell';
-import { emailSignUp, emailSignIn, guestSignIn, appleSignIn, resetPassword } from '../../lib/firebase';
+import { emailSignUp, emailSignIn, guestSignIn, appleSignIn, resetPassword, getMyProfile } from '../../lib/firebase';
+import { DEFAULT_AVATAR } from '../../ui/avatarParts';
 import { AppleAuth, Crypto } from '../../lib/native';
 
 const friendly = (e) => {
@@ -32,6 +33,20 @@ export default function Account() {
 
   const next = (patch = {}) => set({ ...patch, onboardStep: 'school' });
 
+  /* Someone who already finished setup (new phone, or signed out and back
+     in) doesn't redo it. An account only has a saved profile once setup
+     was completed, so that's the signal. Their name, avatar and school
+     come back from the server; only the permissions screen is left. */
+  const continueAs = async (user, fallback = {}) => {
+    const prof = user && !user.isAnonymous ? await getMyProfile(user.uid) : null;
+    if (prof && prof.name && prof.avatar) {
+      set({
+        userName: prof.name, avatar: { ...DEFAULT_AVATAR, ...prof.avatar }, schoolId: prof.schoolId || 'ttu',
+        onboardStep: 'welcomeback',
+      });
+    } else next(fallback);
+  };
+
   const submit = async () => {
     setError(null); setInfo(null); setBusy('email');
     try {
@@ -41,7 +56,7 @@ export default function Account() {
         next({ userName: name.trim() });
       } else {
         const u = await emailSignIn(email.trim(), password);
-        next(u.displayName ? { userName: u.displayName } : {});
+        await continueAs(u, u.displayName ? { userName: u.displayName } : {});
       }
     } catch (e) { setError(friendly(e)); }
     setBusy(null);
@@ -50,15 +65,15 @@ export default function Account() {
   const apple = async () => {
     setError(null); setBusy('apple');
     try {
-      const { name: n } = await appleSignIn(AppleAuth, Crypto);
-      next(n ? { userName: n } : {});
+      const res = await appleSignIn(AppleAuth, Crypto);
+      await continueAs(res.user || res, res.name ? { userName: res.name } : {});
     } catch (e) { const m = friendly(e); if (m) setError(m); }
     setBusy(null);
   };
 
   const guest = async () => {
     setBusy('guest');
-    try { await guestSignIn(); } catch (e) { /* offline is fine — local features still work */ }
+    try { await guestSignIn(); } catch (e) { /* offline is fine, local features still work */ }
     next();
     setBusy(null);
   };

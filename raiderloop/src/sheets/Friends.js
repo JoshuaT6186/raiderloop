@@ -1,15 +1,15 @@
 /**
- * Friends: list, requests, classmates (opt-in), and location sharing.
+ * Friends: list, requests, and location sharing.
  * See lib/location.js for the safety rules sharing follows.
  */
-import React, { useEffect, useState } from 'react';
-import { View, Pressable, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Pressable } from 'react-native';
 import { Sheet, T, PostIt, PT, Card, Button, Row, Chip, Field, Toggle, Empty, Divider } from '../ui/Paper';
 import Icon from '../ui/Icon';
 import Avatar from '../ui/Avatar';
 import { useTheme } from '../theme/ThemeContext';
 import { useApp } from '../state/AppContext';
-import { api, errText, schoolVerified, refreshSchoolVerification } from '../lib/firebase';
+import { api, errText } from '../lib/firebase';
 import { parseFriendCode, redeemCode } from './QrFriend';
 import { ShareLevelPicker } from './FriendProfile';
 import { startNearby, nearbyAvailable } from '../lib/nearby';
@@ -19,7 +19,6 @@ import { sharingActive, expiryFor, goGhost, getForegroundPermission, lastSeenLab
 const TABS = [
   { id: 'friends', label: 'Friends', icon: 'users' },
   { id: 'requests', label: 'Requests', icon: 'userPlus' },
-  { id: 'classmates', label: 'Classmates', icon: 'cap' },
   { id: 'sharing', label: 'Sharing', icon: 'location' },
 ];
 
@@ -96,78 +95,6 @@ function RequestsTab() {
           )} />
       ))}
       <T kind="small" style={{ marginTop: 10 }}>Declining is silent. They aren't told.</T>
-    </View>
-  );
-}
-
-function ClassmatesTab() {
-  const { t } = useTheme();
-  const { classmatesOptIn, set, scheduleItems, showToast, sentRequests, setSheet } = useApp();
-  const [results, setResults] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [verified, setVerified] = useState(schoolVerified());
-  useEffect(() => { refreshSchoolVerification().then((r) => setVerified(r.verified)).catch(() => {}); }, []);
-  const classes = scheduleItems.filter((c) => !c.oneOff).map((c) => ({ course: c.title, section: c.section || '' }));
-  const toggle = async (v) => {
-    if (v && !verified) { setSheet({ type: 'verifySchool' }); return; }
-    set({ classmatesOptIn: v });
-    try { await api.setClassmateOptIn({ optIn: v, classes: v ? classes : [] }); if (v) search(); } catch (e) { showToast(errText(e)); set({ classmatesOptIn: !v }); }
-    if (!v) setResults(null);
-  };
-  const search = async () => {
-    setBusy(true);
-    try { const r = await api.findClassmates({}); setResults(r.data?.matches || []); } catch (e) { showToast(errText(e)); }
-    setBusy(false);
-  };
-  useEffect(() => { if (classmatesOptIn && verified) search(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [verified]);
-  const request = (p) => api.sendFriendRequest({ uid: p.uid }).then(() => { set((s) => ({ sentRequests: [...new Set([...s.sentRequests, p.uid])] })); showToast('Request sent'); }).catch((e) => showToast(errText(e)));
-  const more = (p) => Alert.alert(p.name, undefined, [
-    { text: 'Report', onPress: () => api.reportContent({ uid: p.uid, reason: 'Reported from class list', kind: 'user' }).then(() => showToast('Reported. Thanks!')).catch((e) => showToast(errText(e))) },
-    { text: 'Block', style: 'destructive', onPress: () => api.blockUser({ uid: p.uid }).then(() => { showToast("Blocked. They can't see you"); search(); }).catch((e) => showToast(errText(e))) },
-    { text: 'Cancel', style: 'cancel' },
-  ]);
-  return (
-    <View>
-      {!verified ? (
-        <PostIt color="blue" tilt={-1} tape>
-          <PT kind="title">Verify your TTU email first</PT>
-          <PT kind="small" style={{ marginTop: 4 }}>Class lists only show verified Texas Tech students. It takes a minute.</PT>
-          <Button title="Verify @ttu.edu email" icon="lock" small onPress={() => setSheet({ type: 'verifySchool' })} style={{ marginTop: 10, alignSelf: 'flex-start' }} />
-        </PostIt>
-      ) : null}
-      <Card style={{ marginTop: verified ? 0 : 14 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View style={{ flex: 1 }}>
-            <T kind="bold">Show me in class lists</T>
-            <T kind="small">Only other verified students in the same class (and section, if you both added one) see your first name and avatar. Turn it off any time.</T>
-          </View>
-          <Toggle value={classmatesOptIn} onChange={toggle} label="Show me in class lists" />
-        </View>
-      </Card>
-      {classmatesOptIn ? (
-        <View style={{ marginTop: 14 }}>
-          {!classes.length ? <T kind="small">Add classes in the Planner first (with the section number, if you know it).</T> : null}
-          {busy && !results ? <T kind="hand">looking…</T> : null}
-          {results ? (results.length ? results.map((m) => (
-            <PostIt key={m.course} color="blue" seed={m.course} style={{ marginTop: 10 }}>
-              <PT kind="title">{m.course}{m.section ? ` · Sec ${m.section}` : ''}</PT>
-              <PT kind="small">{m.count ? `${m.count} ${m.count === 1 ? 'classmate' : 'classmates'} listed` : 'Nobody else listed yet'}</PT>
-              {(m.people || []).map((p) => (
-                <View key={p.uid} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-                  <Avatar config={p.avatar} size={34} />
-                  <PT kind="bold" style={{ flex: 1, marginLeft: 8 }}>{p.name}</PT>
-                  {p.friend ? <PT kind="small">Friends</PT> : p.requested || sentRequests.includes(p.uid) ? <PT kind="small">Requested</PT> : (
-                    <Button title="Add friend" small kind="ghost" onPress={() => request(p)} style={{ backgroundColor: '#fff' }} />
-                  )}
-                  <Pressable onPress={() => more(p)} hitSlop={10} style={{ marginLeft: 8 }} accessibilityLabel={`More for ${p.name}`}><Icon name="dots" color="#1F2A44" /></Pressable>
-                </View>
-              ))}
-            </PostIt>
-          )) : <Empty icon="cap" title="No classmates on Flyer yet" body="Invite friends from your classes. The more people opt in, the more this finds." />) : null}
-          {results ? <Button title="Refresh" icon="refresh" small kind="ghost" loading={busy} onPress={search} style={{ marginTop: 12, alignSelf: 'flex-start' }} /> : null}
-          <T kind="small" color={t.pencil} style={{ marginTop: 10 }}>Classmates here added these classes themselves, so TTU hasn't confirmed enrollment. Tap ··· on anyone to report or block.</T>
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -296,7 +223,6 @@ export default function FriendsSheet({ initialTab, onClose }) {
         <>
           {tab === 'friends' ? <FriendsTab /> : null}
           {tab === 'requests' ? <RequestsTab /> : null}
-          {tab === 'classmates' ? <ClassmatesTab /> : null}
           {tab === 'sharing' ? <SharingTab /> : null}
         </>
       )}

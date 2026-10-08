@@ -13,6 +13,7 @@ import Tour from './Tour';
 const MAP = {
   welcome: Welcome, account: Account, school: School, profile: Profile, avatar: AvatarStep,
   interests: Interests, schedule: ScheduleStep, permissions: Permissions, tour: Tour,
+  welcomeback: () => <Permissions returning />,
 };
 
 export default function Onboarding() {

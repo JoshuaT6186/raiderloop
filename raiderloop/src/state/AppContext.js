@@ -29,7 +29,7 @@ const DEFAULTS = {
   avatar: DEFAULT_AVATAR,
   interests: [],
   scheduleItems: [],
-  assignments: [], // { id, title, course, due (ISO), done, source: 'manual'|'canvas'|'syllabus', url? }
+  assignments: [], // { id, title, course, due (ISO), done, source: 'manual'|'syllabus', url? }
   gradeCourses: [], // { id, name, credits, grade }
   priorGpa: '',
   priorCredits: '',
@@ -37,14 +37,12 @@ const DEFAULTS = {
   followedOrgIds: [],
   theme: 'system', // system | light (notebook) | dark (chalkboard)
   notif: { classes: true, leadMinutes: 15, weather: true, assignments: true, assignmentLeadHours: 24, saved: true },
-  classmatesOptIn: false,
   sharing: { on: false, allowed: [], until: null, precise: false }, // until: ISO | null (until I turn it off)
   isPlus: false,
   adConsentAsked: false,
   pilotUsedToday: 0,
   pilotDay: '',
   dismissedTips: [],
-  canvasCourses: [], // { name, score } from Canvas sync
   scheduleShare: { levels: {} }, // friendUid → 'busy' | 'full' (absent = off)
   nearby: { on: false, allow: [] }, // nearby-friend alerts (mutual opt-in)
   flightAuto: false, // automatic check-ins for flight score (needs Always location)
@@ -162,11 +160,6 @@ export function AppProvider({ children }) {
   const addAssignment = (a) => set((p) => ({ assignments: [...p.assignments, { done: false, source: 'manual', ...a, id: a.id || uid('asg') }] }));
   const updateAssignment = (id, patch) => set((p) => ({ assignments: p.assignments.map((a) => (a.id === id ? { ...a, ...patch } : a)) }));
   const removeAssignment = (id) => set((p) => ({ assignments: p.assignments.filter((a) => a.id !== id) }));
-  const mergeCanvasAssignments = (items) => set((p) => {
-    const manual = p.assignments.filter((a) => a.source !== 'canvas');
-    const doneIds = new Set(p.assignments.filter((a) => a.done).map((a) => a.id));
-    return { assignments: [...manual, ...items.map((i) => ({ ...i, source: 'canvas', done: doneIds.has(i.id) || !!i.done }))] };
-  });
 
   /* ---------- saves & follows ---------- */
   const isSaved = (id) => state.savedEvents.some((e) => e.id === id);
@@ -204,7 +197,7 @@ export function AppProvider({ children }) {
     tab, setTab, sheet, setSheet, pilotOpen, setPilotOpen, pilotSeed, setPilotSeed,
     conflict, setConflict, toast, showToast,
     addClass, updateClass, removeClass, replaceSchedule, addEventToSchedule,
-    addAssignment, updateAssignment, removeAssignment, mergeCanvasAssignments,
+    addAssignment, updateAssignment, removeAssignment,
     isSaved, toggleSave, toggleFollow, goToBuilding, notePilotUse, resetAll,
     blocked, flight, meetups, chats, markChatRead, unreadChats, pendingMeetups, friendsLoaded,
     // eslint-disable-next-line react-hooks/exhaustive-deps

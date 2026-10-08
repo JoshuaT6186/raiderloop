@@ -1,5 +1,5 @@
 /**
- * Home — the front page of your notebook. Calm, personal, short:
+ * Home: the front page of your notebook. Calm, personal, short:
  * weather, what's next, what's due, and a few headlines.
  */
 import React, { useState } from 'react';
@@ -88,7 +88,7 @@ function UpNext({ next, now }) {
 
 function DueSoon() {
   const { t } = useTheme();
-  const { assignments, updateAssignment, setTab, set } = useApp();
+  const { assignments, updateAssignment, setTab, set, setSheet } = useApp();
   const list = assignments.filter((a) => !a.done && a.due).sort((a, b) => new Date(a.due) - new Date(b.due)).slice(0, 3);
   return (
     <>
@@ -111,6 +111,10 @@ function DueSoon() {
       ) : (
         <Card onPress={() => setTab('schedule')}><T kind="hand">all caught up ✓</T><T kind="small">Add assignments in the Planner to get reminders.</T></Card>
       )}
+      <Pressable onPress={() => setSheet({ type: 'syllabus' })} hitSlop={8} accessibilityRole="button" accessibilityLabel="Scan a syllabus" style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10 }}>
+        <Icon name="scan" size={18} color={t.accent} />
+        <T kind="hand" color={t.accent} style={{ marginLeft: 8 }}>Scan a syllabus to add every due date</T>
+      </Pressable>
     </>
   );
 }

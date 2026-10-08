@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { View, Pressable } from 'react-native';
 import { useApp } from '../../state/AppContext';
-import { T, PostIt, PT, Button, Section, Empty, Check, Stamp } from '../../ui/Paper';
+import { T, PostIt, PT, Button, Section, Empty, Check } from '../../ui/Paper';
 import Icon from '../../ui/Icon';
 import AssignmentForm from '../../sheets/AssignmentForm';
-import CanvasCard from './CanvasCard';
 import { dueLabel, metaLine } from '../../lib/time';
 
 function group(list) {
@@ -34,7 +33,6 @@ export default function Assignments() {
 
   return (
     <View>
-      <CanvasCard />
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 16 }}>
         <T kind="hand" style={{ flex: 1 }}>{open ? `${open} to do` : 'nothing due, nice'}</T>
         <Button title="Scan syllabus" icon="scan" small kind="ghost" onPress={() => setSheet({ type: 'syllabus' })} style={{ marginRight: 8 }} />
@@ -51,11 +49,9 @@ export default function Assignments() {
                   <PT kind="bold" style={a.done ? { textDecorationLine: 'line-through' } : null} numberOfLines={2}>{a.title}</PT>
                   <PT kind="small">{metaLine(a.course, dueLabel(a.due))}</PT>
                 </View>
-                {a.source === 'canvas' ? <Stamp label="Canvas" color="#2F5DA8" /> : (
-                  <Pressable onPress={() => setForm(a)} hitSlop={10} accessibilityLabel={`Edit ${a.title}`} style={{ marginLeft: 6 }}>
-                    <Icon name="pencil" size={16} color="#4B5571" />
-                  </Pressable>
-                )}
+                <Pressable onPress={() => setForm(a)} hitSlop={10} accessibilityLabel={`Edit ${a.title}`} style={{ marginLeft: 6 }}>
+                  <Icon name="pencil" size={16} color="#4B5571" />
+                </Pressable>
               </View>
             ))}
           </PostIt>

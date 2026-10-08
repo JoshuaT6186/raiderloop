@@ -30,7 +30,6 @@ FIND YOUR PEOPLE
 • Message friends, or start a flock (a small group chat) with up to 15 friends
 • Send meetup cards: pick a public campus spot and a time, and Flyer checks you in when you're both there
 • Share your schedule (just free/busy, or full) with the friends you choose, and find a time everyone's free
-• Find classmates in your section (verified TTU students only, opt-in)
 • Share where you are (like at a game) with only the friends you pick, for as long as you choose. Turn it off instantly anytime.
 
 EXPLORE
@@ -71,7 +70,7 @@ Terms: [your terms URL] · Privacy: [your privacy URL]
 >
 > **Account deletion (5.1.1(v)):** You → Settings → Delete account. It deletes all server data and the sign-in, and revokes Sign in with Apple tokens.
 >
-> Pilot uses Anthropic's Claude to answer campus questions and explain photos of schoolwork step by step. Canvas sign-in is shown as "waiting on approval" because it needs a key from the university. Camera is used for QR codes and photos the user chooses to send.
+> Pilot uses Anthropic's Claude to answer campus questions and explain photos of schoolwork step by step. Camera is used for QR codes and photos the user chooses to send.
 
 ## Screenshots to take (6.9" iPhone)
 1. Home ("Good morning" + weather + up next + a meetup card)

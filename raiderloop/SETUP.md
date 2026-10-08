@@ -106,7 +106,6 @@ Each of these is coded and switched off until you add the key. The app shows an 
 | **Flyer Plus (RevenueCat)** | Create the subscription in App Store Connect, then an entitlement called `plus` and an offering in RevenueCat. Paste the public SDK key into `src/config.js` → `PURCHASES.iosKey`. Webhook URL = your `revenuecatWebhook` function URL, with the Authorization header set to the `REVENUECAT_WEBHOOK_AUTH` value. | Plus card says purchases aren't set up |
 | **Local sponsors** | Firestore → `sponsors` collection. Add docs like `{ name, offer, url, color: "green", schoolId: "ttu", active: true, startsAt, endsAt }`. | Nothing shown |
 | **Affiliate links** | `src/config.js` → `AFFILIATE.amazonTag` once you're approved for Amazon Associates | Plain links with no tag |
-| **Canvas sign-in** | Needs a Developer Key from TTU's Canvas admins. Put the client ID in `src/config.js` → `CANVAS.clientId` **and** `functions/.env` → `CANVAS_CLIENT_ID`, then `firebase functions:secrets:set CANVAS_CLIENT_SECRET`. Redirect URI to give them: `flyer://canvas-auth` | "Waiting on approval" card; manual assignments work fully |
 | **Support email / privacy URL** | `src/config.js` → `APP` | Placeholders — **must** be real before you submit |
 
 ## 6. Host the privacy policy and terms

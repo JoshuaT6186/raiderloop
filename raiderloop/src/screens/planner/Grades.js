@@ -8,12 +8,12 @@ import { useApp } from '../../state/AppContext';
 import { useTheme } from '../../theme/ThemeContext';
 import { T, PostIt, PT, Card, Button, Section, Field, Chip } from '../../ui/Paper';
 import Icon from '../../ui/Icon';
-import { GRADE_OPTIONS, termGpa, cumulativeGpa, fmtGpa, scoreToLetter } from '../../lib/gpa';
+import { GRADE_OPTIONS, termGpa, cumulativeGpa, fmtGpa } from '../../lib/gpa';
 import { uid } from '../../lib/time';
 
 export default function Grades() {
   const { t } = useTheme();
-  const { gradeCourses, priorGpa, priorCredits, scheduleItems, canvasCourses = [], set } = useApp();
+  const { gradeCourses, priorGpa, priorCredits, scheduleItems, set } = useApp();
   const courses = gradeCourses;
   const update = (id, patch) => set((p) => ({ gradeCourses: p.gradeCourses.map((c) => (c.id === id ? { ...c, ...patch } : c)) }));
   const add = (name = '') => set((p) => ({ gradeCourses: [...p.gradeCourses, { id: uid('g'), name, credits: '3', grade: '' }] }));
@@ -43,7 +43,6 @@ export default function Grades() {
 
       <Section title="Courses" action={scheduleItems.length ? 'import classes' : undefined} onAction={importClasses} />
       {courses.map((c) => {
-        const canvas = canvasCourses.find((x) => x.name && c.name && x.name.toUpperCase().includes(c.name.split(' ')[0]));
         return (
           <Card key={c.id} style={{ marginBottom: 12 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -54,7 +53,6 @@ export default function Grades() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
               {GRADE_OPTIONS.map((g) => <Chip key={g} label={g} active={c.grade === g} onPress={() => update(c.id, { grade: c.grade === g ? '' : g })} />)}
             </ScrollView>
-            {canvas?.score != null ? <T kind="small">Canvas current score: {canvas.score}% (≈ {scoreToLetter(canvas.score)}, your syllabus cutoffs may differ)</T> : null}
           </Card>
         );
       })}

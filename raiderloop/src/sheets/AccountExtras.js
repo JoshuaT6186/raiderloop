@@ -1,5 +1,5 @@
 /**
- * TTU email verification and account deletion.
+ * Account deletion and username.
  */
 import React, { useState } from 'react';
 import { View, Linking, Share } from 'react-native';
@@ -8,52 +8,11 @@ import Icon from '../ui/Icon';
 import { useTheme } from '../theme/ThemeContext';
 import { useApp } from '../state/AppContext';
 import {
-  api, errText, startSchoolVerification, refreshSchoolVerification, deleteMyAccount, signOut, isAppleUser, revokeApple, auth,
+  api, errText, deleteMyAccount, signOut, isAppleUser, revokeApple,
 } from '../lib/firebase';
 import { AppleAuth, Crypto } from '../lib/native';
 import { unregisterPush } from '../lib/push';
 import { stopNearby } from '../lib/nearby';
-
-/* ---------- Verify a TTU email ---------- */
-export function VerifySchoolSheet({ onClose }) {
-  const { t } = useTheme();
-  const { showToast } = useApp();
-  const [email, setEmail] = useState(/@ttu\.edu$/i.test(auth.currentUser?.email || '') ? auth.currentUser.email : '');
-  const [sent, setSent] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const send = async () => {
-    setBusy(true);
-    try { const r = await startSchoolVerification(email); if (r.already) { showToast('Already verified'); onClose(); } else setSent(true); } catch (e) {
-      showToast(/recent/i.test(e.code || e.message) ? 'For security, sign out and back in, then try again.' : errText(e, "Couldn't send the email."));
-    }
-    setBusy(false);
-  };
-  const check = async () => {
-    setBusy(true);
-    const r = await refreshSchoolVerification();
-    setBusy(false);
-    if (r.signedOut) { showToast('Your sign-in email is now your TTU email. Sign in again with it.'); onClose(); return; }
-    if (r.verified) {
-      showToast('TTU email verified. You can join class lists now');
-      onClose();
-    } else showToast("Not verified yet. Tap the link in the email, then try again.");
-  };
-  return (
-    <Sheet title="Verify your TTU email" hand="Class lists are only for real students." onClose={onClose} height={0.75}
-      footer={sent ? <Button title="I tapped the link" icon="check" loading={busy} onPress={check} /> : <Button title="Send verification email" icon="send" loading={busy} disabled={!/^[^@\s]+@ttu\.edu$/i.test(email.trim())} onPress={send} />}>
-      <Field label="TTU email" placeholder="you@ttu.edu" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" editable={!sent} />
-      {sent ? (
-        <PostIt color="green" tilt={-1}>
-          <PT kind="bold">Check {email.trim()}</PT>
-          <PT kind="small" style={{ marginTop: 4 }}>Tap the link in the email from Flyer (it may be in Junk), then come back and tap "I tapped the link".</PT>
-        </PostIt>
-      ) : (
-        <T kind="small">We'll send a link to your @ttu.edu address. If your Flyer account uses a different email, your TTU email becomes your sign-in email once you tap the link. Nobody else sees it.</T>
-      )}
-      <T kind="small" color={t.pencil} style={{ marginTop: 10 }}>Verifying proves you're a TTU student. It doesn't prove which classes you're in. The app says that on every class list.</T>
-    </Sheet>
-  );
-}
 
 /* ---------- Delete account ---------- */
 const DELETES = [

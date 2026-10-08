@@ -19,7 +19,7 @@ src/screens/Campus.js      map: buildings, Citibus, friends' avatars; drawer wit
 src/screens/Planner.js     Classes · Due · GPA · Finals
 src/screens/You.js         profile, friends, Plus, saved, settings, sign out, delete account
 src/sheets/                Pilot, Friends (+ sharing), details, campus tools, forms
-src/lib/                   firebase, notifications, calendar export, location, canvas, ads/plus, widget, hours, gpa
+src/lib/                   firebase, notifications, calendar export, location, ads/plus, widget, hours, gpa
 src/data/                  199 buildings, 508 orgs, 25 dining spots, 96 majors, football, resources
 functions/                 Cloud Functions (AI, live data, social, Canvas, RevenueCat webhook)
 firestore.rules            clients read only their own data + locations shared with them
@@ -40,13 +40,12 @@ docs/                      privacy policy, terms, App Store listing copy
 | Finals exam-time lookup | ✅ Built — fills in once TTU posts the by-class-time grid |
 | Calendar export | ✅ Built |
 | What's open near me, commuter parking, floor plans, safety numbers | ✅ Built |
-| Friends (codes, requests, block), classmates (opt-in) | ✅ Built |
+| Friends (codes, requests, block) | ✅ Built |
 | Location sharing: friends-only, per-friend, quiet revoke, timed, ghost mode, campus-only, gameday | ✅ Built |
 | Pilot (formerly Ask Red) with daily limits | ✅ Built |
 | Greek life section | ✅ Built |
 | Cost protection: auth required, per-user limits, global daily cap | ✅ Built |
 | Ads (AdMob), Flyer Plus (RevenueCat), local sponsors, affiliate links | ✅ Built — needs your account keys |
-| Canvas sign-in (OAuth) | ✅ Built — off until TTU issues a Developer Key |
 | iOS home-screen widget | ✅ Built — needs an EAS build |
 | Library printing status | ↪ Link to IT Help Central (no public live data exists) |
 | Laundry availability | ✗ No TTU data source exists |

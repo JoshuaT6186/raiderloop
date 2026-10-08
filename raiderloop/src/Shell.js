@@ -29,7 +29,7 @@ import {
 } from './sheets/Chats';
 import { FriendSheet, FindTimeSheet } from './sheets/FriendProfile';
 import QrFriendSheet, { parseFriendCode, redeemCode } from './sheets/QrFriend';
-import { VerifySchoolSheet, DeleteAccountSheet, HandleSheet } from './sheets/AccountExtras';
+import { DeleteAccountSheet, HandleSheet } from './sheets/AccountExtras';
 import SyllabusSheet from './sheets/ScanSyllabus';
 import { usePushRegistration, useNotificationTaps } from './lib/push';
 import { busyBlocks, fullClasses } from './lib/schedule';
@@ -72,7 +72,6 @@ function SheetHost() {
     case 'friend': return <FriendSheet uid={sheet.uid} onClose={close} />;
     case 'findTime': return <FindTimeSheet uids={sheet.uids} flockId={sheet.flockId} onClose={close} />;
     case 'qr': return <QrFriendSheet initialTab={sheet.tab} onClose={close} />;
-    case 'verifySchool': return <VerifySchoolSheet onClose={close} />;
     case 'deleteAccount': return <DeleteAccountSheet onClose={close} />;
     case 'handle': return <HandleSheet onClose={sheet.back ? () => setSheet(sheet.back) : close} />;
     case 'syllabus': return <SyllabusSheet onClose={close} />;
@@ -101,7 +100,7 @@ function ConflictPrompt() {
 
 function BackgroundJobs() {
   const app = useApp();
-  const { user, sharing, schoolId, avatar, userName, set, scheduleItems, assignments, onboarded, adConsentAsked, classmatesOptIn, isPlus } = app;
+  const { user, sharing, schoolId, avatar, userName, set, scheduleItems, assignments, onboarded, adConsentAsked, isPlus } = app;
   const weather = useWeather(schoolId);
   useNotificationScheduler(app);
   useWidgetSync({ scheduleItems, assignments, weather });
@@ -145,22 +144,18 @@ function BackgroundJobs() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signedIn]);
 
-  /* Keep the public profile (name, avatar, school) and class-list
-     entry in sync. Debounced; only for real accounts. */
+  /* Keep the public profile (name, avatar, school) in sync.
+     Debounced; only for real accounts. */
   const t = useRef(null);
   useEffect(() => {
     if (!signedIn || !onboarded) return undefined;
     clearTimeout(t.current);
     t.current = setTimeout(() => {
       api.saveProfile({ name: userName, avatar, schoolId }).catch(() => {});
-      if (classmatesOptIn) {
-        const classes = scheduleItems.filter((c) => !c.oneOff).map((c) => ({ course: c.title, section: c.section || '' }));
-        api.setClassmateOptIn({ optIn: true, classes }).catch(() => {});
-      }
     }, 1200);
     return () => clearTimeout(t.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.uid, onboarded, userName, JSON.stringify(avatar), schoolId, classmatesOptIn, JSON.stringify(scheduleItems.map((c) => [c.title, c.section]))]);
+  }, [user?.uid, onboarded, userName, JSON.stringify(avatar), schoolId]);
 
   /* Schedule sharing: send busy blocks (and full classes, only for
      friends set to "full") whenever the schedule or levels change. */

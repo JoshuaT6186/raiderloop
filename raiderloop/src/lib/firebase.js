@@ -14,7 +14,7 @@ import {
   initializeAuth, getAuth, onAuthStateChanged, signInAnonymously,
   createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut as fbSignOut,
   sendPasswordResetEmail, updateProfile, OAuthProvider, signInWithCredential,
-  linkWithCredential, EmailAuthProvider, sendEmailVerification, verifyBeforeUpdateEmail,
+  linkWithCredential, EmailAuthProvider,
   reauthenticateWithCredential, revokeAccessToken,
 } from 'firebase/auth';
 import * as FirebaseAuth from 'firebase/auth';
@@ -86,9 +86,6 @@ export const api = {
   getSponsors: call('getSponsors'),
   getUsage: call('getUsage'),
   getTopRated: call('getTopRated'),
-  canvasExchange: call('canvasExchange'),
-  canvasSync: call('canvasSync'),
-  canvasDisconnect: call('canvasDisconnect'),
   deleteAccount: call('deleteAccount'),
   stopSharing: call('stopSharing'),
   // account-only
@@ -102,8 +99,6 @@ export const api = {
   redeemFriendCode: acct('redeemFriendCode'),
   resetFriendCodes: acct('resetFriendCodes'),
   updateLocation: acct('updateLocation'),
-  setClassmateOptIn: acct('setClassmateOptIn'),
-  findClassmates: acct('findClassmates'),
   reportContent: acct('reportContent'),
   checkIn: acct('checkIn'),
   setFlightPrefs: acct('setFlightPrefs'),
@@ -200,38 +195,6 @@ export async function deleteMyAccount() {
   await api.deleteAccount({});
 }
 
-/* ---------- School email verification ----------
-   Uses Firebase's own verification emails — no extra service. If the
-   account email is already the school address, a verification link is
-   sent to it. Otherwise the school address becomes the sign-in email
-   once the link in it is tapped. */
-export async function startSchoolVerification(email) {
-  const u = auth.currentUser;
-  if (!u || u.isAnonymous) throw new Error('Make an account first.');
-  const e = String(email || '').trim().toLowerCase();
-  if (!/^[^@\s]+@ttu\.edu$/.test(e)) throw new Error('Use your @ttu.edu email.');
-  if ((u.email || '').toLowerCase() === e) {
-    if (u.emailVerified) return { already: true };
-    await sendEmailVerification(u);
-  } else {
-    await verifyBeforeUpdateEmail(u, e);
-  }
-  return { sent: true };
-}
-export async function refreshSchoolVerification() {
-  const u = auth.currentUser;
-  if (!u) return { verified: false };
-  try {
-    await u.reload();
-    await u.getIdToken(true);
-  } catch (e) {
-    // Changing the sign-in email can end the current session.
-    if (/token-expired|invalid-user-token|user-not-found|user-disabled/.test(e.code || '')) return { verified: false, signedOut: true };
-  }
-  const cur = auth.currentUser;
-  return { email: cur?.email || '', verified: !!cur?.emailVerified && /@ttu\.edu$/i.test(cur?.email || '') };
-}
-export const schoolVerified = () => !!auth.currentUser?.emailVerified && /@ttu\.edu$/i.test(auth.currentUser?.email || '');
 
 /* ---------- Photos ----------
    Uploads a picked photo to chatImages/{chatId}/{myUid}/…, then the
@@ -257,6 +220,17 @@ export async function photoUrl(path) {
 const docs = (s) => s.docs.map((d) => ({ id: d.id, ...d.data() }));
 export function listenMyProfile(uid, cb) {
   return onSnapshot(doc(db, 'users', uid), (s) => cb(s.exists() ? s.data() : null), () => cb(null));
+}
+/* One-time read of my server profile (null if there isn't one yet or
+   it can't be reached). Used to recognise a returning account. */
+export function getMyProfile(uid, timeoutMs = 6000) {
+  return new Promise((resolve) => {
+    let done = false; let off = () => {};
+    const finish = (v) => { if (done) return; done = true; clearTimeout(timer); try { off(); } catch (e) { /* already closed */ } resolve(v); };
+    const timer = setTimeout(() => finish(null), timeoutMs);
+    off = onSnapshot(doc(db, 'users', uid), (s) => finish(s.exists() ? s.data() : null), () => finish(null));
+    if (done) off();
+  });
 }
 export function listenFriends(uid, cb) {
   // Second argument: true once the list really loaded (not an error).
