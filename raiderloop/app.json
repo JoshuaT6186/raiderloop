@@ -47,14 +47,16 @@
         "backgroundColor": "#2F5DA8"
       },
       "permissions": [
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "READ_CALENDAR",
-        "WRITE_CALENDAR",
-        "ACCESS_BACKGROUND_LOCATION",
-        "CAMERA",
-        "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_LOCATION"
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.RECORD_AUDIO",
+        "com.google.android.gms.permission.AD_ID"
       ]
     },
     "web": {
@@ -119,8 +121,35 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "REPLACE_WITH_NEW_EAS_PROJECT_ID"
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "bundleIdentifier": "com.joshuat8808.flyer.widget",
+                  "targetName": "FlyerWidget",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.joshuat8808.flyer"
+                    ]
+                  }
+                },
+                {
+                  "bundleIdentifier": "com.joshuat8808.flyer.widget",
+                  "targetName": "FlyerWidget",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.joshuat8808.flyer"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "8a52ed3c-5954-4d35-8517-0468c1454e94"
       }
-    }
+    },
+    "owner": "joshuat8808"
   }
 }
