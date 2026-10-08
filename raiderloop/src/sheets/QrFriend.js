@@ -76,7 +76,7 @@ function MyCode() {
         <Button title="Reset my code" icon="refresh" small kind="ghost" onPress={reset} style={{ flex: 1 }} />
       </View>
       <T kind="small" style={{ marginTop: 12 }}>Codes refresh every few minutes and invite links last 24 hours, so a screenshot posted online stops working. New friends can't see your schedule or location until you choose to share it.</T>
-      <T kind="small" color={t.pencil} style={{ marginTop: 6 }}>Their iPhone camera can scan this too — it opens Flyer and adds you.</T>
+      <T kind="small" color={t.pencil} style={{ marginTop: 6 }}>Their iPhone camera can scan this too. It opens Flyer and adds you.</T>
     </View>
   );
 }
@@ -114,7 +114,7 @@ export default function QrFriendSheet({ initialTab = 'mine', onClose }) {
   const [tab, setTab] = useState(initialTab);
   if (!user || user.isAnonymous) { setTimeout(() => setSheet({ type: 'account' }), 0); return null; }
   return (
-    <Sheet title="Add a friend" hand="Scan in person — no searching." onClose={onClose} height={0.94}>
+    <Sheet title="Add a friend" hand="Scan in person. No searching." onClose={onClose} height={0.94}>
       <View style={{ flexDirection: 'row', borderWidth: 2, borderColor: '#1F2A44', borderRadius: 10, overflow: 'hidden', marginBottom: 14 }}>
         {[['mine', 'My code'], ['scan', 'Scan']].map(([id, label]) => (
           <Pressable key={id} onPress={() => setTab(id)} style={{ flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: tab === id ? '#1F2A44' : t.card }} accessibilityRole="tab" accessibilityState={{ selected: tab === id }}>

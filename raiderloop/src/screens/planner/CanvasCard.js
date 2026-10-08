@@ -59,7 +59,7 @@ export default function CanvasCard() {
       <T kind="small" style={{ marginTop: 6 }}>
         {connected
           ? 'Upcoming assignments and current scores sync from your courses.'
-          : "You'll sign in on Canvas's own page — Flyer never sees your password."}
+          : "You'll sign in on Canvas's own page. Flyer never sees your password."}
       </T>
       <View style={{ flexDirection: 'row', marginTop: 10 }}>
         {connected ? (

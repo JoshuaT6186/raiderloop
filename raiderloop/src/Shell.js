@@ -4,7 +4,7 @@
  * Plus status). Hooks run before any early return.
  */
 import React, { useEffect, useRef } from 'react';
-import { View, StatusBar, Linking } from 'react-native';
+import { View, StatusBar, Linking, AppState } from 'react-native';
 import { useApp } from './state/AppContext';
 import { useTheme } from './theme/ThemeContext';
 import { TabBar, PilotFab } from './ui/Page';
@@ -29,7 +29,8 @@ import {
 } from './sheets/Chats';
 import { FriendSheet, FindTimeSheet } from './sheets/FriendProfile';
 import QrFriendSheet, { parseFriendCode, redeemCode } from './sheets/QrFriend';
-import { VerifySchoolSheet, DeleteAccountSheet } from './sheets/AccountExtras';
+import { VerifySchoolSheet, DeleteAccountSheet, HandleSheet } from './sheets/AccountExtras';
+import SyllabusSheet from './sheets/ScanSyllabus';
 import { usePushRegistration, useNotificationTaps } from './lib/push';
 import { busyBlocks, fullClasses } from './lib/schedule';
 import { useNotificationScheduler } from './lib/notifications';
@@ -38,6 +39,7 @@ import { useLocationBroadcaster } from './lib/location';
 import { useWeather } from './lib/hooks';
 import { usePlusStatus, initAds } from './lib/monetize';
 import { api } from './lib/firebase';
+import { syncBackground, checkNow, saveMeetupsForBackground } from './lib/backgroundLocation';
 
 function SheetHost() {
   const { sheet, setSheet } = useApp();
@@ -72,6 +74,8 @@ function SheetHost() {
     case 'qr': return <QrFriendSheet initialTab={sheet.tab} onClose={close} />;
     case 'verifySchool': return <VerifySchoolSheet onClose={close} />;
     case 'deleteAccount': return <DeleteAccountSheet onClose={close} />;
+    case 'handle': return <HandleSheet onClose={sheet.back ? () => setSheet(sheet.back) : close} />;
+    case 'syllabus': return <SyllabusSheet onClose={close} />;
     default: return null;
   }
 }
@@ -80,7 +84,7 @@ function ConflictPrompt() {
   const { conflict, setConflict, addEventToSchedule } = useApp();
   if (!conflict) return null;
   return (
-    <Sheet title="Heads up — time clash" onClose={() => setConflict(null)} height={0.5}
+    <Sheet title="Time clash" onClose={() => setConflict(null)} height={0.5}
       footer={(
         <View style={{ flexDirection: 'row' }}>
           <Button title="Keep both" kind="ghost" onPress={() => { addEventToSchedule(conflict.incoming, { force: true }); setConflict(null); }} style={{ flex: 1, marginRight: 8 }} />
@@ -119,6 +123,7 @@ function BackgroundJobs() {
     else if (d.open === 'friend' && d.uid) setSheet({ type: 'friend', uid: d.uid });
     else if (d.open === 'friends') setSheet({ type: 'friends', tab: d.tab });
     else if (d.open === 'home') setTab('home');
+    else if (d.open === 'passport') setSheet({ type: 'passport' });
   });
 
   /* flyer://add/CODE — from someone's QR scanned with the iPhone
@@ -188,6 +193,34 @@ function BackgroundJobs() {
     return () => clearTimeout(n.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid, friendsLoaded, nearby.on, JSON.stringify(nearby.allow), friendKey]);
+
+  /* One background location task serves automatic check-ins and
+     nearby alerts. Keep it matching the two switches. */
+  // Wait until saved settings and sign-in have loaded. Otherwise a cold
+  // start (including iOS waking the app for a location update) would
+  // briefly see "off" and stop the task.
+  const { flightAuto, hydrated, meetups } = app;
+  const authKnown = user !== undefined;
+  useEffect(() => {
+    if (!hydrated || !authKnown) return;
+    syncBackground({ flight: !!(signedIn && flightAuto), nearby: !!(signedIn && nearby.on) }).catch(() => {});
+  }, [hydrated, authKnown, signedIn, flightAuto, nearby.on]);
+
+  /* Accepted meetups, so the background task can check you in during
+     a meetup's window even if it already stamped that place today. */
+  const meetKey = JSON.stringify((meetups || []).filter((m) => m.status?.[user?.uid] === 'going').map((m) => [m.id, m.placeId, m.atMs]));
+  useEffect(() => {
+    if (!hydrated || !authKnown) return;
+    saveMeetupsForBackground(signedIn ? JSON.parse(meetKey).map(([id, placeId, atMs]) => ({ id, placeId, atMs })) : []).catch(() => {});
+  }, [hydrated, authKnown, signedIn, meetKey]);
+
+  /* Opening the app counts toward a stay that started in the background. */
+  useEffect(() => {
+    if (!hydrated || !signedIn || !flightAuto) return undefined;
+    checkNow();
+    const sub = AppState.addEventListener('change', (st) => { if (st === 'active') checkNow(); });
+    return () => sub.remove();
+  }, [hydrated, signedIn, flightAuto]);
   return null;
 }
 

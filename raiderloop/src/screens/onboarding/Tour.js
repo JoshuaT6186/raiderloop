@@ -10,10 +10,10 @@ import { PlaneMark } from '../../ui/Logo';
 import { Shell } from './Shell';
 
 const SLIDES = [
-  { color: 'blue', icon: 'plane', title: 'Meet Pilot', body: "Tap the paper airplane anywhere to ask about campus — what's open, where your class is, deadlines. It looks things up live when it needs to." },
+  { color: 'blue', icon: 'plane', title: 'Meet Pilot', body: "Tap the paper airplane anywhere to ask about campus: what's open, where your class is, deadlines. It looks things up live when it needs to." },
   { color: 'yellow', icon: 'clipboard', title: 'Never miss a due date', body: 'Add assignments, track your GPA, see your finals countdown, and export your whole week to your calendar in one tap.' },
-  { color: 'green', icon: 'campus', title: "What's open near you", body: 'Dining, study spots, parking lots, floor plans, and the campus police number — all one tap away.' },
-  { color: 'pink', icon: 'users', title: 'Find your people', body: 'Add friends, see who shares your classes (if they opt in), and share where you are with only the friends you pick — like at a game.' },
+  { color: 'green', icon: 'campus', title: "What's open near you", body: 'Dining, study spots, parking, floor plans and the campus police number. All one tap away.' },
+  { color: 'pink', icon: 'users', title: 'Find your people', body: 'Add friends, see who shares your classes (if they opt in), and share where you are with only the friends you pick, like at a game.' },
 ];
 
 export default function Tour() {

@@ -16,7 +16,7 @@ import {
   buildingById, catLabel, walkLabel, floorPlanFor, ORGS, DINING, BUS_STOPS, RESOURCES, isGreek,
 } from '../data/campus';
 import { placeById } from '../data/places';
-import { CheckInCard, RatingSummary, useCheckIn } from './PlaceExtras';
+import { CheckInCard, RatingSummary, AutoCheckInNote, DWELL_MIN } from './PlaceExtras';
 
 function HoursTable({ spec }) {
   const { t } = useTheme();
@@ -49,7 +49,6 @@ function eventLive(ev, now = Date.now()) {
 export function EventSheet({ ev, onClose }) {
   const { t } = useTheme();
   const { isSaved, toggleSave, addEventToSchedule, setSheet } = useApp();
-  const { busy, run } = useCheckIn();
   const saved = isSaved(ev.id);
   const b = ev.buildingId ? buildingById(ev.buildingId) : null;
   const live = eventLive(ev);
@@ -68,15 +67,15 @@ export function EventSheet({ ev, onClose }) {
       </PostIt>
       {live ? (
         <PostIt color="green" seed={`live-${ev.id}`} style={{ marginTop: 14 }}>
-          <PT kind="bold">Happening now — check in for +25 flight score</PT>
-          <Button title="I'm here" icon="check" small loading={busy} onPress={() => run({ eventId: ev.id })} style={{ marginTop: 8, alignSelf: 'flex-start' }} />
+          <PT kind="bold">Happening now: +25 flight score for showing up</PT>
+          <AutoCheckInNote text={`Stay about ${DWELL_MIN} minutes and Flyer stamps you automatically.`} style={{ marginTop: 4 }} />
         </PostIt>
       ) : null}
       <View style={{ marginTop: 16 }}>
         {b ? <Row title="Walking directions" meta={metaLine(b.name, walkLabel(b))} left={<Icon name="walk" color={t.ink} />} onPress={() => openDirections(b)} /> : null}
         <Row title="Send to a friend in Flyer" meta="As a card in a chat" left={<Icon name="chat" color={t.ink} />} onPress={() => setSheet({ type: 'shareCard', card: { type: 'event', title: ev.title, date: ev.date, time: ev.time, location: ev.location || b?.name || '', sourceUrl: ev.sourceUrl || null } })} />
         {ev.sourceUrl ? <Row title="Original listing" meta="Opens the source page" left={<Icon name="link" color={t.ink} />} onPress={() => openUrl(ev.sourceUrl)} /> : null}
-        <Row title="Send to a friend" left={<Icon name="share" color={t.ink} />} onPress={() => shareText(`${ev.title} — ${metaLine(ev.date, ev.time, ev.location || b?.name)} (via Flyer)`)} last />
+        <Row title="Send to a friend" left={<Icon name="share" color={t.ink} />} onPress={() => shareText(`${ev.title}: ${metaLine(ev.date, ev.time, ev.location || b?.name)} (via Flyer)`)} last />
       </View>
       {!/today|tonight/i.test(ev.date || '') && ev.time ? <T kind="small" style={{ marginTop: 10 }}>"Add to today" only works on the day of the event.</T> : null}
     </Sheet>
@@ -102,7 +101,7 @@ export function OrgSheet({ id, onClose }) {
         {enrich.loading ? <Loading label="Looking for their socials…" /> : null}
         {enrich.data?.instagramUrl ? <Row title="Instagram" meta="Their real profile" left={<Icon name="camera" color={t.ink} />} onPress={() => openUrl(enrich.data.instagramUrl)} /> : null}
         {enrich.data?.activeSignal ? <T kind="small" style={{ marginTop: 6 }}>Activity: {enrich.data.activeSignal}</T> : null}
-        <Row title="Find on TechConnect" meta="Official directory — join, events, officers" left={<Icon name="link" color={t.ink} />} onPress={() => openUrl(`https://techconnect.ttu.edu/organizations?query=${encodeURIComponent(o.name)}`)} last />
+        <Row title="Find on TechConnect" meta="Official directory: join, events, officers" left={<Icon name="link" color={t.ink} />} onPress={() => openUrl(`https://techconnect.ttu.edu/organizations?query=${encodeURIComponent(o.name)}`)} last />
       </View>
       <T kind="small" style={{ marginTop: 10 }}>Meeting times aren't published in the directory export, so check TechConnect or their socials for when they meet.</T>
     </Sheet>
@@ -170,7 +169,7 @@ export function DiningSheet({ id, onClose }) {
         <PostIt color="orange" seed={d.id}>
           {vendors.map((v) => <PT key={v} kind="body" style={{ paddingVertical: 2 }}>• {v}</PT>)}
         </PostIt>
-      ) : <T kind="small">Single-location spot — no separate stations listed.</T>}
+      ) : <T kind="small">Single-location spot, no separate stations listed.</T>}
       <T kind="small" style={{ marginTop: 10 }}>Hours from TTU Hospitality Services. Holidays and breaks can change them.</T>
     </Sheet>
   );

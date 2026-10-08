@@ -36,7 +36,7 @@ function ReviewSheet({ raw, onConfirm, onClose }) {
   const valid = items.filter(isValid).map((i) => ({ ...i, place: `${buildingById(i.buildingId)?.name || ''}${i.room ? ` ${i.room}` : ''}`.trim(), type: 'class' }));
 
   return (
-    <Sheet title="Check these first" hand="Scanning can misread a screenshot — tap any class to fix it." onClose={onClose}
+    <Sheet title="Check these first" hand="Scanning can misread a screenshot. Tap any class to fix it." onClose={onClose}
       footer={<Button title={`Add ${valid.length} ${valid.length === 1 ? 'class' : 'classes'}`} icon="check" disabled={!valid.length} onPress={() => onConfirm(valid)} />}>
       {items.length ? items.map((i, idx) => {
         const b = i.buildingId ? buildingById(i.buildingId) : null;
@@ -77,7 +77,7 @@ export default function ScanSchedule({ onConfirm, compact }) {
       const res = await api.parseSchedule({ imageBase64: asset.base64, mediaType });
       const classes = res?.data?.classes || [];
       setBusy(false);
-      if (!classes.length) { setError("Couldn't find any classes in that image — try a clearer, full-screen screenshot."); return; }
+      if (!classes.length) { setError("Couldn't find any classes. Try a clearer, full-screen screenshot."); return; }
       setRaw(classes);
     } catch (e) {
       setBusy(false);

@@ -7,13 +7,13 @@
  * hide it, or block the sender.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, ScrollView, TextInput, Pressable, Alert, Image, ActivityIndicator } from 'react-native';
+import { View, ScrollView, TextInput, Pressable, Alert, Image, ActivityIndicator, Modal, Share, Linking, Platform, useWindowDimensions } from 'react-native';
 import { Sheet, T, PostIt, PT, Button, Row, Field, Empty, Toggle, Divider, Loading } from '../ui/Paper';
 import Icon from '../ui/Icon';
 import Avatar from '../ui/Avatar';
 import { useTheme } from '../theme/ThemeContext';
 import { useApp } from '../state/AppContext';
-import { ImagePicker } from '../lib/native';
+import { ImagePicker, FileSystem } from '../lib/native';
 import {
   api, errText, listenMessages, uploadChatPhoto, photoUrl,
 } from '../lib/firebase';
@@ -74,7 +74,7 @@ export function ChatsSheet({ onClose }) {
             )}
             onPress={() => setSheet({ type: 'chat', chatId: c.id })} chevron={false} last={i === chats.length - 1} />
         );
-      }) : <Empty icon="chat" title="No messages yet" body={friends.length ? 'Open a friend and tap Message, or start a flock.' : 'Add friends first — messages are friends-only.'} />}
+      }) : <Empty icon="chat" title="No messages yet" body={friends.length ? 'Open a friend and tap Message, or start a flock.' : 'Add friends first. Messages are friends-only.'} />}
       {friends.length ? (
         <>
           <T kind="tiny" style={{ marginTop: 18, marginBottom: 6 }}>Message a friend</T>
@@ -93,13 +93,74 @@ export function ChatsSheet({ onClose }) {
 }
 
 /* ---------- Message bubbles ---------- */
-function PhotoBubble({ path }) {
+// Photos keep their real shape (notes and whiteboards are usually tall)
+// within a 230 x 300 box. Old messages without a size show square.
+function bubbleSize(w, h) {
+  const r = w && h ? w / h : 1;
+  let width = r >= 1 ? 230 : Math.max(140, 300 * r);
+  let height = width / r;
+  if (height > 300) { height = 300; width = 300 * r; }
+  return { width: Math.round(width), height: Math.round(height) };
+}
+
+function PhotoBubble({ path, w, h, onOpen, onLongPress }) {
   const { t } = useTheme();
   const [url, setUrl] = useState(null);
   useEffect(() => { photoUrl(path).then(setUrl).catch(() => setUrl(false)); }, [path]);
+  const size = bubbleSize(w, h);
   if (url === false) return <T kind="small">Photo unavailable</T>;
-  if (!url) return <View style={{ width: 200, height: 150, alignItems: 'center', justifyContent: 'center', backgroundColor: t.paperDeep, borderRadius: 10 }}><ActivityIndicator color={t.accent} /></View>;
-  return <Image source={{ uri: url }} style={{ width: 220, height: 220, borderRadius: 10, backgroundColor: t.paperDeep }} resizeMode="cover" accessibilityLabel="Photo" />;
+  if (!url) return <View style={{ ...size, alignItems: 'center', justifyContent: 'center', backgroundColor: t.paperDeep, borderRadius: 10 }}><ActivityIndicator color={t.accent} /></View>;
+  return (
+    <Pressable onPress={() => onOpen(url)} onLongPress={onLongPress} delayLongPress={350} accessibilityRole="imagebutton" accessibilityLabel="Photo. Tap to open full screen.">
+      <Image source={{ uri: url }} style={{ ...size, borderRadius: 10, backgroundColor: t.paperDeep }} resizeMode="cover" />
+    </Pressable>
+  );
+}
+
+/* Full-screen photo with pinch to zoom (iOS) and Save / Share. */
+async function savePhoto(url, showToast) {
+  try {
+    if (Platform.OS === 'ios' && FileSystem?.File && FileSystem?.Paths) {
+      const dest = new FileSystem.File(FileSystem.Paths.cache, `flyer-photo-${Date.now()}.jpg`);
+      const file = await FileSystem.File.downloadFileAsync(url, dest);
+      await Share.share({ url: file.uri });
+    } else {
+      await Linking.openURL(url);
+    }
+  } catch (e) { showToast("Couldn't open that photo to save. Try again."); }
+}
+
+function PhotoViewer({ photo, onClose }) {
+  const { showToast } = useApp();
+  const { width: W, height: H } = useWindowDimensions();
+  if (!photo) return null;
+  const r = photo.w && photo.h ? photo.w / photo.h : 1;
+  let iw = W; let ih = W / r;
+  const maxH = H - 200;
+  if (ih > maxH) { ih = maxH; iw = maxH * r; }
+  return (
+    <Modal visible animationType="fade" transparent={false} onRequestClose={onClose} statusBarTranslucent>
+      <View style={{ flex: 1, backgroundColor: '#0E1320' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 56, paddingHorizontal: 16, paddingBottom: 10 }}>
+          <Pressable onPress={onClose} hitSlop={12} accessibilityLabel="Close photo" style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="close" color="#FFFFFF" />
+          </Pressable>
+          <Pressable onPress={() => savePhoto(photo.url, showToast)} hitSlop={10} accessibilityLabel="Save or share photo" style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.14)' }}>
+            <Icon name="share" size={18} color="#FFFFFF" />
+            <T kind="bold" color="#FFFFFF" style={{ marginLeft: 6 }}>Save</T>
+          </Pressable>
+        </View>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, alignItems: 'center', justifyContent: 'center' }}
+          maximumZoomScale={4} minimumZoomScale={1} centerContent bouncesZoom showsHorizontalScrollIndicator={false} showsVerticalScrollIndicator={false}>
+          <Image source={{ uri: photo.url }} style={{ width: iw, height: ih }} resizeMode="contain" accessibilityLabel="Photo" />
+        </ScrollView>
+        <View style={{ paddingHorizontal: 20, paddingBottom: 40, paddingTop: 10 }}>
+          {photo.caption ? <T color="#FFFFFF" style={{ marginBottom: 6 }}>{photo.caption}</T> : null}
+          <T kind="small" color="rgba(255,255,255,0.6)">Pinch to zoom · Tap Save to keep it or send it on</T>
+        </View>
+      </View>
+    </Modal>
+  );
 }
 
 function CardBubble({ card, onOpen }) {
@@ -140,6 +201,8 @@ export function ChatSheet({ chatId: initialId, withUid, onClose }) {
   const [busy, setBusy] = useState(false);
   const [attach, setAttach] = useState(false);
   const [info, setInfo] = useState(false);
+  const [pending, setPending] = useState([]); // photos picked, waiting to send
+  const [viewing, setViewing] = useState(null);
   const scroller = useRef(null);
 
   useEffect(() => {
@@ -161,22 +224,46 @@ export function ChatSheet({ chatId: initialId, withUid, onClose }) {
   const send = async (payload) => {
     if (!chatId) return;
     setBusy(true);
-    try { await api.sendMessage({ chatId, ...payload }); setText(''); setAttach(false); } catch (e) { showToast(errText(e, "Couldn't send — try again.")); }
+    try { await api.sendMessage({ chatId, ...payload }); setText(''); setAttach(false); } catch (e) { showToast(errText(e, "Couldn't send. Try again.")); }
     setBusy(false);
   };
-  const sendPhoto = async (fromCamera) => {
+  const MAX_PHOTOS = 4;
+  const pickPhotos = async (fromCamera) => {
     if (!ImagePicker) { showToast('Photos need the full app build.'); return; }
+    const left = MAX_PHOTOS - pending.length;
+    if (left <= 0) { showToast(`Up to ${MAX_PHOTOS} photos at a time.`); return; }
     const perm = fromCamera ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) { showToast(fromCamera ? 'Camera is off for Flyer in Settings.' : 'Photos are off for Flyer in Settings.'); return; }
-    const opts = { quality: 0.6, mediaTypes: ['images'], allowsEditing: false };
+    const opts = { quality: 1, mediaTypes: ['images'], allowsEditing: false, ...(fromCamera ? {} : { allowsMultipleSelection: true, selectionLimit: left, orderedSelection: true }) };
     const res = fromCamera ? await ImagePicker.launchCameraAsync(opts) : await ImagePicker.launchImageLibraryAsync(opts);
-    if (res.canceled || !res.assets?.[0]) return;
+    if (res.canceled || !res.assets?.length) return;
+    const ready = [];
+    for (const asset of res.assets.slice(0, left)) {
+      const a = await preparePhoto(asset).catch(() => null);
+      if (a?.uri) ready.push({ id: `${Date.now()}-${ready.length}`, uri: a.uri, w: a.width, h: a.height });
+    }
+    if (ready.length < Math.min(res.assets.length, left)) showToast("Some photos couldn't be opened.");
+    setPending((p) => [...p, ...ready].slice(0, MAX_PHOTOS));
+    setAttach(false);
+  };
+  // Photos go one at a time (each is safety-checked). The caption rides
+  // on the first photo; a long one goes as its own message instead.
+  const sendPhotos = async () => {
+    if (!chatId || !pending.length || busy) return;
     setBusy(true);
+    let caption = text.trim();
+    let left = [...pending];
     try {
-      const a = await preparePhoto(res.assets[0]);
-      const path = await uploadChatPhoto(chatId, a.uri);
-      await api.sendMessage({ chatId, imagePath: path, w: a.width, h: a.height, text: text.trim() || null });
-      setText(''); setAttach(false);
+      // A long caption goes first as its own message.
+      if (caption.length > 300) { await api.sendMessage({ chatId, text: caption }); caption = ''; setText(''); }
+      for (const a of pending) {
+        const path = await uploadChatPhoto(chatId, a.uri);
+        await api.sendMessage({ chatId, imagePath: path, w: a.w, h: a.h, text: caption || null });
+        // The caption rides on the first photo only, so a retry won't repeat it.
+        if (caption) { caption = ''; setText(''); }
+        left = left.filter((x) => x.id !== a.id);
+        setPending(left);
+      }
     } catch (e) { showToast(errText(e, "Couldn't send that photo.")); }
     setBusy(false);
   };
@@ -201,7 +288,7 @@ export function ChatSheet({ chatId: initialId, withUid, onClose }) {
     ]);
   };
   const report = async (m, reason) => {
-    try { await api.reportContent({ chatId, messageId: m.id, reason: reason || '' }); set((p) => ({ hiddenMsgs: [...p.hiddenMsgs, m.id].slice(-500) })); showToast('Reported — thanks. It\'s hidden for you.'); } catch (e) { showToast(errText(e)); }
+    try { await api.reportContent({ chatId, messageId: m.id, reason: reason || '' }); set((p) => ({ hiddenMsgs: [...p.hiddenMsgs, m.id].slice(-500) })); showToast('Reported. It\'s hidden for you.'); } catch (e) { showToast(errText(e)); }
   };
   const block = (uid) => Alert.alert('Block?', "They won't be able to find, add, or message you, and their messages are hidden. They aren't told.", [
     { text: 'Cancel', style: 'cancel' },
@@ -220,19 +307,42 @@ export function ChatSheet({ chatId: initialId, withUid, onClose }) {
         <View>
           {attach ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 }}>
-              <Button title="Photo" icon="image" small kind="ghost" onPress={() => sendPhoto(false)} style={{ marginRight: 6, marginBottom: 6 }} />
-              <Button title="Camera" icon="camera" small kind="ghost" onPress={() => sendPhoto(true)} style={{ marginRight: 6, marginBottom: 6 }} />
+              <Button title="Photos" icon="image" small kind="ghost" onPress={() => pickPhotos(false)} style={{ marginRight: 6, marginBottom: 6 }} />
+              <Button title="Camera" icon="camera" small kind="ghost" onPress={() => pickPhotos(true)} style={{ marginRight: 6, marginBottom: 6 }} />
               <Button title="Meetup" icon="users" small kind="ghost" onPress={() => setSheet(chat?.type === 'flock' ? { type: 'meetupNew', flockId: chatId } : { type: 'meetupNew', to: (chat?.members || []).filter((u) => u !== me) })} style={{ marginRight: 6, marginBottom: 6 }} />
               <Button title="Class" icon="schedule" small kind="ghost" onPress={shareClass} style={{ marginRight: 6, marginBottom: 6 }} />
               <Button title="Note" icon="pencil" small kind="ghost" onPress={() => { if (!text.trim()) { showToast('Type the note first, then tap Note.'); return; } send({ card: { type: 'note', title: text.trim().slice(0, 60), body: text.trim() } }); }} style={{ marginBottom: 6 }} />
+            </View>
+          ) : null}
+          {pending.length ? (
+            <View style={{ marginBottom: 8 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {pending.map((p, i) => (
+                  <View key={p.id} style={{ marginRight: 10, paddingTop: 8 }}>
+                    <Image source={{ uri: p.uri }} style={{ width: 62, height: 62, borderRadius: 8, borderWidth: 1.5, borderColor: '#1F2A44' }} accessibilityLabel={`Photo ${i + 1}`} />
+                    {!busy ? (
+                      <Pressable onPress={() => setPending((x) => x.filter((y) => y.id !== p.id))} hitSlop={10} accessibilityLabel={`Remove photo ${i + 1}`}
+                        style={{ position: 'absolute', top: 0, right: -8, width: 22, height: 22, borderRadius: 11, backgroundColor: t.card, borderWidth: 1.5, borderColor: '#1F2A44', alignItems: 'center', justifyContent: 'center' }}>
+                        <Icon name="close" size={11} color="#1F2A44" />
+                      </Pressable>
+                    ) : null}
+                  </View>
+                ))}
+                {pending.length < MAX_PHOTOS && !busy ? (
+                  <Pressable onPress={() => pickPhotos(false)} accessibilityLabel="Add another photo" style={{ marginTop: 8, width: 62, height: 62, borderRadius: 8, borderWidth: 1.5, borderStyle: 'dashed', borderColor: t.borderStrong, alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon name="plus" size={18} color={t.inkSoft} />
+                  </Pressable>
+                ) : null}
+              </ScrollView>
+              <T kind="small" style={{ fontSize: 11, marginTop: 4 }}>{busy ? 'Sending… each photo gets a quick safety check.' : `${pending.length} ${pending.length === 1 ? 'photo' : 'photos'} ready. Add a caption if you want, then tap send.`}</T>
             </View>
           ) : null}
           <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: t.card, borderWidth: 2, borderColor: t.mode === 'dark' ? t.borderStrong : '#1F2A44', borderRadius: 16, paddingLeft: 6, paddingRight: 6, paddingVertical: 6 }}>
             <Pressable onPress={() => setAttach(!attach)} accessibilityLabel="Attach" style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: t.postit.green, borderWidth: 1.5, borderColor: '#1F2A44' }}>
               <Icon name={attach ? 'close' : 'plus'} size={18} color="#1F2A44" />
             </Pressable>
-            <TextInput style={{ flex: 1, fontSize: 16, color: t.ink, paddingVertical: 6, paddingHorizontal: 10 }} placeholder={chat?.type === 'flock' ? `Message ${chat.name}` : 'Message'} placeholderTextColor={t.faint} value={text} onChangeText={setText} multiline maxLength={1000} />
-            <Pressable onPress={() => text.trim() && send({ text })} disabled={busy || !text.trim()} accessibilityLabel="Send" style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: t.highlight, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#1F2A44', opacity: text.trim() ? 1 : 0.5 }}>
+            <TextInput style={{ flex: 1, fontSize: 16, color: t.ink, paddingVertical: 6, paddingHorizontal: 10 }} placeholder={pending.length ? 'Add a caption…' : chat?.type === 'flock' ? `Message ${chat.name}` : 'Message'} placeholderTextColor={t.faint} value={text} onChangeText={setText} multiline maxLength={1000} />
+            <Pressable onPress={() => (pending.length ? sendPhotos() : text.trim() && send({ text }))} disabled={busy || (!text.trim() && !pending.length)} accessibilityLabel={pending.length ? 'Send photos' : 'Send'} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: t.highlight, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#1F2A44', opacity: text.trim() || pending.length ? 1 : 0.5 }}>
               {busy ? <ActivityIndicator color="#1F2A44" /> : <Icon name="send" size={18} color="#1F2A44" />}
             </Pressable>
           </View>
@@ -247,7 +357,7 @@ export function ChatSheet({ chatId: initialId, withUid, onClose }) {
           return (
             <Pressable key={m.id} onLongPress={() => longPress(m)} delayLongPress={350} style={{ alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '82%', marginBottom: 8 }}>
               {showName ? <T kind="small" style={{ fontSize: 11, marginBottom: 2 }}>{nameOf(m.from)}</T> : null}
-              {m.kind === 'image' ? <PhotoBubble path={m.image.path} /> : null}
+              {m.kind === 'image' ? <PhotoBubble path={m.image.path} w={m.image.w} h={m.image.h} onLongPress={() => longPress(m)} onOpen={(url) => setViewing({ url, w: m.image.w, h: m.image.h, caption: m.text })} /> : null}
               {m.kind === 'card' ? <View style={{ minWidth: 220 }}><CardBubble card={m.card} onOpen={onClose} /></View> : null}
               {m.text && m.kind !== 'card' ? (
                 <View style={{ backgroundColor: mine ? t.accent : t.card, borderRadius: 14, borderBottomRightRadius: mine ? 4 : 14, borderTopLeftRadius: mine ? 14 : 4, paddingHorizontal: 12, paddingVertical: 8, borderWidth: mine ? 0 : 1, borderColor: t.border, marginTop: m.kind === 'image' ? 4 : 0 }}>
@@ -258,6 +368,7 @@ export function ChatSheet({ chatId: initialId, withUid, onClose }) {
           );
         })}
       </ScrollView>
+      <PhotoViewer photo={viewing} onClose={() => setViewing(null)} />
     </Sheet>
   );
 }
@@ -313,7 +424,7 @@ function FlockInfo({ chat, onBack, onClose }) {
       ) : (
         <>
           <Row title="See their profile" left={<Icon name="you" color={t.ink} />} onPress={() => setSheet({ type: 'friend', uid: other })} />
-          <Row title="Report" left={<Icon name="report" color={t.redPen} />} onPress={() => run(() => api.reportContent({ uid: other, reason: 'Reported from chat', kind: 'user' }), 'Reported — thanks')} />
+          <Row title="Report" left={<Icon name="report" color={t.redPen} />} onPress={() => run(() => api.reportContent({ uid: other, reason: 'Reported from chat', kind: 'user' }), 'Reported. Thanks!')} />
           <Row title="Block" left={<Icon name="close" color={t.redPen} />} onPress={() => Alert.alert('Block?', "They won't be able to find, add, or message you. They aren't told.", [{ text: 'Cancel', style: 'cancel' }, { text: 'Block', style: 'destructive', onPress: () => run(() => api.blockUser({ uid: other }).then(onClose), 'Blocked') }])} last />
         </>
       )}
@@ -334,7 +445,7 @@ export function NewFlockSheet({ onClose }) {
     setBusy(false);
   };
   return (
-    <Sheet title="New flock" hand={`A small group chat with friends — up to ${FLOCK_MAX} people.`} onClose={onClose} height={0.9}
+    <Sheet title="New flock" hand={`A small group chat with friends, up to ${FLOCK_MAX} people.`} onClose={onClose} height={0.9}
       footer={<Button title="Start flock" icon="check" loading={busy} disabled={name.trim().length < 2 || !picked.length} onPress={create} />}>
       <Field label="Name" placeholder="Library Crew" value={name} onChangeText={setName} maxLength={40} />
       <T kind="tiny" style={{ marginBottom: 6 }}>Friends ({picked.length + 1}/{FLOCK_MAX})</T>

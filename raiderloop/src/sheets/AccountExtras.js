@@ -34,9 +34,9 @@ export function VerifySchoolSheet({ onClose }) {
     setBusy(false);
     if (r.signedOut) { showToast('Your sign-in email is now your TTU email. Sign in again with it.'); onClose(); return; }
     if (r.verified) {
-      showToast('TTU email verified — you can join class lists now');
+      showToast('TTU email verified. You can join class lists now');
       onClose();
-    } else showToast("Not verified yet — tap the link in the email, then try again.");
+    } else showToast("Not verified yet. Tap the link in the email, then try again.");
   };
   return (
     <Sheet title="Verify your TTU email" hand="Class lists are only for real students." onClose={onClose} height={0.75}
@@ -50,7 +50,7 @@ export function VerifySchoolSheet({ onClose }) {
       ) : (
         <T kind="small">We'll send a link to your @ttu.edu address. If your Flyer account uses a different email, your TTU email becomes your sign-in email once you tap the link. Nobody else sees it.</T>
       )}
-      <T kind="small" color={t.pencil} style={{ marginTop: 10 }}>Verifying proves you're a TTU student. It doesn't prove which classes you're in — the app says that on every class list.</T>
+      <T kind="small" color={t.pencil} style={{ marginTop: 10 }}>Verifying proves you're a TTU student. It doesn't prove which classes you're in. The app says that on every class list.</T>
     </Sheet>
   );
 }
@@ -86,7 +86,7 @@ export function DeleteAccountSheet({ onClose }) {
       };
       const json = `{"server": ${r.data.json},\n"thisPhone": ${JSON.stringify(local, null, 2)}}`;
       await Share.share({ message: json, title: 'My Flyer data' });
-    } catch (e) { showToast(errText(e, "Couldn't get your data — try again.")); }
+    } catch (e) { showToast(errText(e, "Couldn't get your data. Try again.")); }
     setBusy(null);
   };
 
@@ -98,13 +98,13 @@ export function DeleteAccountSheet({ onClose }) {
         await revokeApple(AppleAuth, Crypto).catch(() => {});
       }
       await unregisterPush().catch(() => {});
-      await stopNearby().catch(() => {});
       await deleteMyAccount();
+      await stopNearby().catch(() => {});
       await signOut().catch(() => {});
       resetAll();
       showToast('Your account was deleted');
     } catch (e) {
-      showToast(errText(e, "Couldn't delete your account — check your connection and try again."));
+      showToast(errText(e, "Couldn't delete your account. Check your connection and try again."));
       setBusy(null);
     }
   };
@@ -126,12 +126,53 @@ export function DeleteAccountSheet({ onClose }) {
       ))}
       <PostIt color="yellow" tilt={-0.8} style={{ marginTop: 14 }}>
         <PT kind="bold">{isPlus ? 'You have Flyer Plus' : 'Flyer Plus is separate'}</PT>
-        <PT kind="small" style={{ marginTop: 4 }}>Deleting your account does not cancel a subscription — Apple bills it. Cancel it in your Apple ID settings so you aren't charged.</PT>
+        <PT kind="small" style={{ marginTop: 4 }}>Deleting your account does not cancel a subscription. Apple bills it. Cancel it in your Apple ID settings so you aren't charged.</PT>
         <Button title="Open subscriptions" small kind="ghost" onPress={() => Linking.openURL('https://apps.apple.com/account/subscriptions').catch(() => {})} style={{ marginTop: 8, alignSelf: 'flex-start', backgroundColor: '#fff' }} />
       </PostIt>
       <Row title="Download my data first" meta="Everything Flyer has about you, as text you can save" left={<Icon name="share" color={t.ink} />} onPress={download} right={busy === 'export' ? <T kind="small">…</T> : null} last />
       <Field label="Type DELETE to confirm" placeholder="DELETE" value={typed} onChangeText={setTyped} autoCapitalize="characters" style={{ marginTop: 14 }} />
       {isAppleUser() ? <T kind="small">Since you use Sign in with Apple, Apple will ask you to confirm once more so Flyer's access can be revoked.</T> : null}
+    </Sheet>
+  );
+}
+
+/* ---------- Choose your @username ----------
+   People add you by typing it exactly — there's no searchable list of
+   students, so a username can't be used to browse who's on Flyer. */
+export function localHandleError(raw) {
+  const h = String(raw || '').trim().toLowerCase().replace(/^@/, '');
+  if (!h) return null;
+  if (!/^[a-z0-9_]*$/.test(h)) return 'Use only letters, numbers and underscores.';
+  if (h.length > 20) return 'Usernames are 3 to 20 characters.';
+  if (/^_|__/.test(h)) return "Underscores can't be at the start or doubled.";
+  return null;
+}
+
+export function HandleSheet({ onClose }) {
+  const { t } = useTheme();
+  const { profile, showToast } = useApp();
+  const [value, setValue] = useState(profile?.handle || '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const h = value.trim().toLowerCase().replace(/^@/, '');
+  const local = localHandleError(h);
+  const unchanged = h === (profile?.handle || '');
+  const save = async () => {
+    setBusy(true); setError(null);
+    try { const r = await api.setHandle({ handle: h }); showToast(`You're @${r.data.handle}`); onClose(); } catch (e) { setError(errText(e, "Couldn't save that username.")); }
+    setBusy(false);
+  };
+  return (
+    <Sheet title="Your username" hand="Friends type this to add you." onClose={onClose} height={0.7}
+      footer={<Button title="Save" icon="check" loading={busy} disabled={unchanged || h.length < 3 || !!local} onPress={save} />}>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <T kind="marker" style={{ fontSize: 26, marginRight: 6, marginBottom: 14 }}>@</T>
+        <Field value={h} onChangeText={(v) => { setValue(v); setError(null); }} placeholder="yourname" autoCapitalize="none" autoCorrect={false}
+          maxLength={21} autoFocus style={{ flex: 1 }} returnKeyType="done" onSubmitEditing={() => { if (!unchanged && h.length >= 3 && !local) save(); }} />
+      </View>
+      {local || error ? <T kind="small" color={t.redPen} style={{ marginTop: -6, marginBottom: 10 }}>{local || error}</T> : null}
+      <T kind="small">3 to 20 letters, numbers or underscores. People can only find you by typing your exact username. Flyer doesn't have a list of students to browse.</T>
+      <T kind="small" color={t.pencil} style={{ marginTop: 8 }}>If you change it, your old username stops working and someone else can take it.</T>
     </Sheet>
   );
 }

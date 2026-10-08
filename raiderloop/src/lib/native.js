@@ -16,6 +16,8 @@ function tryRequire(fn) {
 export const SvgLib = tryRequire(() => require('react-native-svg'));
 export const Maps = Platform.OS === 'web' ? null : tryRequire(() => require('react-native-maps'));
 export const ImagePicker = tryRequire(() => require('expo-image-picker'));
+export const DocumentPicker = tryRequire(() => require('expo-document-picker'));
+export const FileSystem = tryRequire(() => require('expo-file-system'));
 export const Notifications = tryRequire(() => {
   const N = require('expo-notifications');
   N.setNotificationHandler({

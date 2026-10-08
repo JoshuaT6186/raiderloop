@@ -12,7 +12,7 @@ import { useApp } from '../state/AppContext';
 import { api, errText, schoolVerified, refreshSchoolVerification } from '../lib/firebase';
 import { parseFriendCode, redeemCode } from './QrFriend';
 import { ShareLevelPicker } from './FriendProfile';
-import { startNearby, stopNearby, nearbyAvailable } from '../lib/nearby';
+import { startNearby, nearbyAvailable } from '../lib/nearby';
 import { shareText } from '../lib/links';
 import { sharingActive, expiryFor, goGhost, getForegroundPermission, lastSeenLabel } from '../lib/location';
 
@@ -57,15 +57,16 @@ function FriendsTab() {
       <Row title="Messages" meta={unreadChats ? `${unreadChats} unread` : 'Friends and flocks'} left={<Icon name="chat" color={t.ink} />} onPress={() => setSheet({ type: 'chats' })} />
       {profile?.handle ? (
         <Card style={{ marginVertical: 14 }}>
-          <T kind="tiny">Your friend code (sends a request)</T>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-            <T kind="marker" style={{ fontSize: 26, flex: 1 }}>@{profile.handle}</T>
-            <Button title="Share" icon="share" small kind="ghost" onPress={() => shareText(`Add me on Flyer — my friend code is @${profile.handle}`)} />
+          <T kind="tiny">Your username. Friends type it to send a request</T>
+          <T kind="title" style={{ marginTop: 4 }} selectable>@{profile.handle}</T>
+          <View style={{ flexDirection: 'row', marginTop: 10 }}>
+            <Button title="Change" icon="pencil" small kind="ghost" onPress={() => setSheet({ type: 'handle', back: { type: 'friends' } })} style={{ flex: 1, marginRight: 8 }} />
+            <Button title="Share" icon="share" small kind="ghost" onPress={() => shareText(`Add me on Flyer! My username is @${profile.handle}`)} style={{ flex: 1 }} />
           </View>
         </Card>
       ) : null}
       <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-        <Field placeholder="@code or invite code" value={code} onChangeText={setCode} autoCapitalize="none" style={{ flex: 1, marginRight: 8 }} />
+        <Field placeholder="@username or invite code" value={code} onChangeText={setCode} autoCapitalize="none" style={{ flex: 1, marginRight: 8 }} />
         <Button title="Add" small loading={busy} disabled={code.trim().length < 3} onPress={add} style={{ marginTop: 2 }} />
       </View>
       {friends.length ? friends.map((f, i) => {
@@ -94,7 +95,7 @@ function RequestsTab() {
             </View>
           )} />
       ))}
-      <T kind="small" style={{ marginTop: 10 }}>Declining is silent — they aren't told.</T>
+      <T kind="small" style={{ marginTop: 10 }}>Declining is silent. They aren't told.</T>
     </View>
   );
 }
@@ -121,8 +122,8 @@ function ClassmatesTab() {
   useEffect(() => { if (classmatesOptIn && verified) search(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [verified]);
   const request = (p) => api.sendFriendRequest({ uid: p.uid }).then(() => { set((s) => ({ sentRequests: [...new Set([...s.sentRequests, p.uid])] })); showToast('Request sent'); }).catch((e) => showToast(errText(e)));
   const more = (p) => Alert.alert(p.name, undefined, [
-    { text: 'Report', onPress: () => api.reportContent({ uid: p.uid, reason: 'Reported from class list', kind: 'user' }).then(() => showToast('Reported — thanks')).catch((e) => showToast(errText(e))) },
-    { text: 'Block', style: 'destructive', onPress: () => api.blockUser({ uid: p.uid }).then(() => { showToast("Blocked — they can't see you"); search(); }).catch((e) => showToast(errText(e))) },
+    { text: 'Report', onPress: () => api.reportContent({ uid: p.uid, reason: 'Reported from class list', kind: 'user' }).then(() => showToast('Reported. Thanks!')).catch((e) => showToast(errText(e))) },
+    { text: 'Block', style: 'destructive', onPress: () => api.blockUser({ uid: p.uid }).then(() => { showToast("Blocked. They can't see you"); search(); }).catch((e) => showToast(errText(e))) },
     { text: 'Cancel', style: 'cancel' },
   ]);
   return (
@@ -162,9 +163,9 @@ function ClassmatesTab() {
                 </View>
               ))}
             </PostIt>
-          )) : <Empty icon="cap" title="No classmates on Flyer yet" body="Invite friends from your classes — the more people opt in, the more this finds." />) : null}
+          )) : <Empty icon="cap" title="No classmates on Flyer yet" body="Invite friends from your classes. The more people opt in, the more this finds." />) : null}
           {results ? <Button title="Refresh" icon="refresh" small kind="ghost" loading={busy} onPress={search} style={{ marginTop: 12, alignSelf: 'flex-start' }} /> : null}
-          <T kind="small" color={t.pencil} style={{ marginTop: 10 }}>Classmates here added these classes themselves — TTU hasn't confirmed enrollment. Tap ··· on anyone to report or block.</T>
+          <T kind="small" color={t.pencil} style={{ marginTop: 10 }}>Classmates here added these classes themselves, so TTU hasn't confirmed enrollment. Tap ··· on anyone to report or block.</T>
         </View>
       ) : null}
     </View>
@@ -177,12 +178,12 @@ function SharingTab() {
   const update = (patch) => set((p) => ({ sharing: { ...p.sharing, ...patch } }));
   const toggleFriend = (uid) => update({ allowed: sharing.allowed.includes(uid) ? sharing.allowed.filter((x) => x !== uid) : [...sharing.allowed, uid] });
   const start = async (opt) => {
-    if (!(await getForegroundPermission(true))) { showToast('Location is off for Flyer — turn it on in Settings to share.'); return; }
+    if (!(await getForegroundPermission(true))) { showToast('Turn on location for Flyer in Settings to share.'); return; }
     if (!sharing.allowed.length) { showToast('Pick at least one friend first.'); return; }
     update({ on: true, until: expiryFor(opt) });
     showToast('Sharing while Flyer is open');
   };
-  const ghost = async () => { update({ on: false, until: null }); await goGhost(); showToast('Ghost mode — your location was removed'); };
+  const ghost = async () => { update({ on: false, until: null }); await goGhost(); showToast('Ghost mode on. Your location was removed.'); };
 
   return (
     <View>
@@ -232,7 +233,7 @@ function ScheduleSharing() {
     <View>
       <Divider />
       <T kind="title">Schedule sharing</T>
-      <T kind="small" style={{ marginBottom: 6 }}>{n ? `Shared with ${n} ${n === 1 ? 'friend' : 'friends'}.` : 'Off for everyone.'} Free / busy shows only when you're in class — no class names or rooms.</T>
+      <T kind="small" style={{ marginBottom: 6 }}>{n ? `Shared with ${n} ${n === 1 ? 'friend' : 'friends'}.` : 'Off for everyone.'} Free / busy shows only when you're in class. No class names or rooms.</T>
       {friends.map((f, i) => (
         <View key={f.uid} style={{ paddingVertical: 8, borderBottomWidth: i === friends.length - 1 ? 0 : 1, borderColor: 'rgba(31,42,68,0.12)', borderStyle: 'dashed' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}><Avatar config={f.avatar} size={28} /><T kind="bold" style={{ marginLeft: 8 }}>{f.name}</T></View>
@@ -253,9 +254,8 @@ function NearbyAlerts() {
       const r = await startNearby();
       if (!r.ok) { showToast(r.message); setBusy(false); return; }
       set((p) => ({ nearby: { ...p.nearby, on: true } }));
-      showToast('Nearby alerts on — pick friends below');
+      showToast('Nearby alerts on. Pick friends below.');
     } else {
-      await stopNearby();
       set((p) => ({ nearby: { ...p.nearby, on: false } }));
     }
     setBusy(false);
@@ -271,7 +271,7 @@ function NearbyAlerts() {
           right={<Toggle value={nearby.allow.includes(f.uid)} onChange={() => toggleFriend(f.uid)} label={`Nearby alerts with ${f.name}`} />} />
       )) : null}
       <T kind="small" color={t.pencil} style={{ marginTop: 6 }}>
-        Both of you have to pick each other. Nobody ever sees where you are — just "Maya is nearby". Campus only, never 11 PM–7 AM, at most once every 3 hours per friend. This is the one Flyer feature that uses location in the background, so iOS will ask for "Always" access.
+        Both of you have to pick each other. Nobody sees where you are, just "Maya is nearby". Campus only, never 11 PM–7 AM, at most once every 3 hours per friend. Like automatic check-ins, this uses location in the background, so iOS will ask for "Always" access.
       </T>
     </View>
   );

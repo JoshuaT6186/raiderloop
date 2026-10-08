@@ -74,7 +74,7 @@ export function PlusSheet({ onClose }) {
   const perks = [
     ['tag', 'No ads, anywhere'],
     ['plane', `${LIMITS.pilotPlus} Pilot questions a day (instead of ${LIMITS.pilotFree})`],
-    ['star', 'Extra avatar gear — grad cap, jersey'],
+    ['star', 'Extra avatar gear: grad cap, jersey'],
     ['heart', 'Keeps a student-built app running'],
   ];
   return (

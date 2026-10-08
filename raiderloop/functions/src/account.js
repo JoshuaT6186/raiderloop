@@ -60,6 +60,8 @@ exports.deleteAccount = onCall({ ...C.callOpts(), timeoutSeconds: 300 }, async (
   await S.deleteQuery(db.collection(`users/${uid}/blocked`));
   const user = await db.doc(`users/${uid}`).get();
   if (user.exists && user.data().handle) await del(`handles/${user.data().handle}`);
+  // Old usernames still on hold after a change.
+  await S.deleteQuery(db.collection('handles').where('uid', '==', uid));
   await S.deleteQuery(db.collection('friendCodes').where('uid', '==', uid));
 
   // Ratings come out of the public averages, not just my copy.

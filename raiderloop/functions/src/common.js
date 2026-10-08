@@ -135,10 +135,11 @@ async function spend(n = 1) {
 }
 
 const FAST_MODEL = 'claude-haiku-4-5-20251001';
-async function callClaude({ system, messages, maxTokens, tools, model }) {
+async function callClaude({ system, messages, maxTokens, tools, model, toolChoice }) {
   await spend();
   const body = { model: model || MODEL, max_tokens: maxTokens, system, messages };
   if (tools) body.tools = tools;
+  if (tools && toolChoice) body.tool_choice = toolChoice;
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY.value(), 'anthropic-version': '2023-06-01' },
@@ -223,12 +224,12 @@ function parseJsonObject(text) {
 function recencyGuard() {
   const d = new Date().toISOString().slice(0, 10);
   return `
-TODAY'S REAL DATE IS ${d}. You have no clock of your own — use that date, and only that date, to judge whether something is current.
+TODAY'S REAL DATE IS ${d}. You have no clock of your own. Use that date, and only that date, to judge whether something is current.
 
 RECENCY RULES (apply before including ANY entry):
 1. If an entry's date is before ${d}, DROP IT.
 2. If you cannot determine a specific date for an entry, DROP IT.
-3. Watch the year. "October 18" with no year on a page from a previous year is NOT this year — drop it.
+3. Watch the year. "October 18" with no year on a page from a previous year is NOT this year. Drop it.
 4. DROP anything written in past tense describing something already resolved ("was closed", "has been restored", "was cancelled").
 5. When uncertain whether something is current, DROP IT. An empty result is correct; a stale result shown as current is a real failure.`;
 }

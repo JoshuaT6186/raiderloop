@@ -81,7 +81,7 @@ function UpNext({ next, now }) {
           {plan ? <Button title="Floor plan" icon="layers" small kind="ghost" onPress={() => openUrl(plan.url)} /> : null}
         </View>
       ) : null}
-      {!happening && b && b.walk && inMin <= b.walk + 5 && inMin > 0 ? <T kind="small" color={t.redPen} style={{ marginTop: 8 }}>Leave now — it's about a {b.walk}-minute walk.</T> : null}
+      {!happening && b && b.walk && inMin <= b.walk + 5 && inMin > 0 ? <T kind="small" color={t.redPen} style={{ marginTop: 8 }}>Leave now. It's about a {b.walk}-minute walk.</T> : null}
     </Card>
   );
 }

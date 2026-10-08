@@ -27,7 +27,7 @@ function Perm({ icon, title, body, state, onAsk, color }) {
           <T kind="small" style={{ marginTop: 2 }}>{body}</T>
           <View style={{ marginTop: 10, flexDirection: 'row' }}>
             {state === 'granted' ? <Stamp label="On" color={t.ok} />
-              : state === 'denied' ? <Stamp label="Off — change in Settings" color={t.pencil} />
+              : state === 'denied' ? <Stamp label="Off in Settings" color={t.pencil} />
                 : <Button title="Allow" small onPress={onAsk} />}
           </View>
         </View>
@@ -49,11 +49,11 @@ export default function Permissions() {
         body="A nudge before each class (with rain or cold heads-ups), before assignments are due, and before saved events."
         onAsk={async () => setNotif((await ensureNotificationPermission(true)) ? 'granted' : 'denied')} />
       <Perm icon="location" color="green" title="Location while using Flyer" state={loc}
-        body="Sorts what's open by real walking distance. Friends can only ever see you if you turn on sharing and pick them — that's separate."
+        body="Sorts what's open by real walking distance. Friends can only ever see you if you turn on sharing and pick them. That's separate."
         onAsk={async () => setLoc((await getForegroundPermission(true)) ? 'granted' : 'denied')} />
       {ads ? (
         <Perm icon="tag" color="pink" title="Ads that keep Flyer free" state={ads}
-          body="iOS will ask if apps can track you across other apps. Saying no is totally fine — you'll still see ads, just less relevant ones. Your schedule, location, and friends are never shared with advertisers."
+          body="iOS will ask if apps can track you across other apps. Saying no is totally fine. You'll still see ads, just less relevant ones. Your schedule, location, and friends are never shared with advertisers."
           onAsk={async () => { await initAds({ askTracking: true }); setAds('granted'); }} />
       ) : null}
     </Shell>

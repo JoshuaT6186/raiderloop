@@ -14,7 +14,7 @@ export default function ScheduleStep() {
   const [form, setForm] = useState(null); // null | 'new' | item
   return (
     <Shell step="schedule" onBack={() => set({ onboardStep: 'interests' })}
-      footer={<Button title={scheduleItems.length ? 'Continue' : 'Skip — add classes later'} kind={scheduleItems.length ? 'primary' : 'ghost'} icon="chevronRight" onPress={() => set({ onboardStep: 'permissions' })} />}>
+      footer={<Button title={scheduleItems.length ? 'Continue' : 'Skip, add classes later'} kind={scheduleItems.length ? 'primary' : 'ghost'} icon="chevronRight" onPress={() => set({ onboardStep: 'permissions' })} />}>
       <Heading eyebrow="step six" title="Add your classes" sub="Flyer reminds you before each one, with the weather for the walk over." />
       <ScanSchedule onConfirm={(items) => items.forEach((i) => addClass(i))} />
       <Card style={{ marginTop: 12 }} onPress={() => setForm('new')}>

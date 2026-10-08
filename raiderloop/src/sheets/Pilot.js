@@ -34,7 +34,7 @@ import { preparePhoto } from '../lib/photos';
 
 const SUGGESTIONS = [
   'Where is my next class?', "What's due this week?", "What's open to eat right now?",
-  "What's happening tonight?", 'Best study spots?', 'When is the next game?',
+  "What's happening tonight?", 'Best study spots?', 'When is the next game?', 'Help me start an essay',
 ];
 
 const FIXED = [
@@ -81,7 +81,7 @@ export default function Pilot({ onClose }) {
     if (/(next|my) class|where.*class|what.*class|schedule today/.test(low)) {
       const nowM = new Date().getHours() * 60 + new Date().getMinutes();
       const next = sortByTime(itemsOnDay(scheduleItems, todayCode())).find((i) => (toMinutes(i.endTime) ?? 0) > nowM);
-      if (!next) return { text: scheduleItems.length ? "You're done with classes for today." : "You haven't added any classes yet — add them in the Planner and I'll know." };
+      if (!next) return { text: scheduleItems.length ? "You're done with classes for today." : "You haven't added any classes yet. Add them in the Planner and I'll know." };
       const b = buildingById(next.buildingId);
       return { text: `${next.title} at ${next.time} in ${next.place || b?.name}.${b?.walk ? ` About a ${b.walk}-minute walk.` : ''}`, buildingId: next.buildingId };
     }
@@ -89,10 +89,10 @@ export default function Pilot({ onClose }) {
       const due = assignments.filter((a) => !a.done && a.due).sort((a, b) => new Date(a.due) - new Date(b.due));
       const week = due.filter((a) => new Date(a.due) - new Date() < 7 * 86400000);
       if (!due.length) return { text: "Nothing in your planner is due. If that's wrong, add assignments in Planner → Due.", tab: 'schedule' };
-      return { text: week.length ? `You have ${week.length} due this week:\n${week.slice(0, 5).map((a) => `• ${a.title}${a.course ? ` (${a.course})` : ''} — ${dueLabel(a.due)}`).join('\n')}` : `Nothing this week. Next up: ${due[0].title}, ${dueLabel(due[0].due)}.`, tab: 'schedule' };
+      return { text: week.length ? `You have ${week.length} due this week:\n${week.slice(0, 5).map((a) => `• ${a.title}${a.course ? ` (${a.course})` : ''}, ${dueLabel(a.due)}`).join('\n')}` : `Nothing this week. Next up: ${due[0].title}, ${dueLabel(due[0].due)}.`, tab: 'schedule' };
     }
     if (/weather|rain|cold|hot|jacket|umbrella|outside/.test(low)) {
-      if (weather.loading) return { text: 'Still checking the weather — ask again in a sec.' };
+      if (weather.loading) return { text: 'Still checking the weather. Ask again in a sec.' };
       if (weather.error) return { text: "I can't reach the weather service right now." };
       return { text: `It's ${weather.temp}° and ${weather.condition.toLowerCase()} in Lubbock. High ${weather.hi}°, low ${weather.lo}°.` };
     }
@@ -103,9 +103,9 @@ export default function Pilot({ onClose }) {
     }
     if (/next (football )?game|when.*game|who.*play/.test(low)) {
       const g = nextGame();
-      return { text: g ? `${g.homeAway === 'home' ? 'Home vs.' : 'Away at'} ${g.opponent} — ${gameDateLabel(g.kickoff)} at ${g.venue}.` : 'Football season is over.' };
+      return { text: g ? `${g.homeAway === 'home' ? 'Home vs.' : 'Away at'} ${g.opponent}, ${gameDateLabel(g.kickoff)} at ${g.venue}.` : 'Football season is over.' };
     }
-    if (/saved|bookmark/.test(low)) return { text: savedEvents.length ? `You have ${savedEvents.length} saved ${savedEvents.length === 1 ? 'event' : 'events'} — they're in You.` : 'Nothing saved yet.', tab: 'you' };
+    if (/saved|bookmark/.test(low)) return { text: savedEvents.length ? `You have ${savedEvents.length} saved ${savedEvents.length === 1 ? 'event' : 'events'}. They're in You.` : 'Nothing saved yet.', tab: 'you' };
     return null;
   };
 
@@ -115,9 +115,9 @@ export default function Pilot({ onClose }) {
     try {
       const r = await api.getTopRated({ category: 'study' });
       const top = (r.data.places || []).slice(0, 4);
-      if (top.length) return { text: `Top-rated study spots on Flyer (from students who checked in):\n${top.map((x) => `• ${x.name} — ${x.overall}★ (quiet ${x.quiet}, outlets ${x.outlets})`).join('\n')}`, buildingIds: top.map((x) => x.id) };
+      if (top.length) return { text: `Top-rated study spots on Flyer (from students who checked in):\n${top.map((x) => `• ${x.name}: ${x.overall}★ (quiet ${x.quiet}, outlets ${x.outlets})`).join('\n')}`, buildingIds: top.map((x) => x.id) };
     } catch (e) { /* fall through */ }
-    return { text: 'Not enough ratings yet to rank study spots — these are good bets. Check in and rate them to help!', buildingIds: ['texas-tech-university-library', 'student-union'] };
+    return { text: 'Not enough ratings yet to rank study spots. These are good bets. Get stamped there and rate them to help!', buildingIds: ['texas-tech-university-library', 'student-union'] };
   };
 
   const pickPhoto = () => {
@@ -132,7 +132,7 @@ export default function Pilot({ onClose }) {
       if (!a || !a.base64) return;
       setPhoto({ uri: a.uri, base64: a.base64, mediaType: a.mimeType });
     };
-    Alert.alert('Ask about a photo', 'Notes, a worksheet, a whiteboard — Pilot explains it step by step.', [
+    Alert.alert('Ask about a photo', 'Notes, a worksheet or a whiteboard. Pilot explains it step by step.', [
       { text: 'Take photo', onPress: () => go(true) },
       { text: 'Choose photo', onPress: () => go(false) },
       { text: 'Cancel', style: 'cancel' },
@@ -153,7 +153,7 @@ export default function Pilot({ onClose }) {
     const fixed = img ? null : FIXED.find((r) => r.match.some((m) => low.includes(m)));
     if (fixed) { setThread((p) => [...p, { role: 'p', hit: fixed }]); return; }
     if (usedToday >= limit) {
-      setThread((p) => [...p, { role: 'p', hit: { text: isPlus ? "You've hit today's question limit — it resets at midnight." : `That's all ${limit} free questions for today. They reset at midnight, or Flyer Plus gives you ${LIMITS.pilotPlus} a day.`, plus: !isPlus } }]);
+      setThread((p) => [...p, { role: 'p', hit: { text: isPlus ? "You've hit today's question limit. It resets at midnight." : `That's all ${limit} free questions for today. They reset at midnight, or Flyer Plus gives you ${LIMITS.pilotPlus} a day.`, plus: !isPlus } }]);
       return;
     }
     const id = `pending-${Date.now()}`;
@@ -168,7 +168,7 @@ export default function Pilot({ onClose }) {
       const reply = (res?.data?.text || '').trim() || "I don't have verified information on that.";
       setThread((p) => p.map((m) => (m.id === id ? { role: 'p', hit: { text: reply, sources: res?.data?.sources || [] } } : m)));
     } catch (e) {
-      const msg = e?.code === 'functions/resource-exhausted' ? e.message : "I couldn't reach the server — try again in a moment.";
+      const msg = e?.code === 'functions/resource-exhausted' ? e.message : "I couldn't reach the server. Try again in a moment.";
       setThread((p) => p.map((m) => (m.id === id ? { role: 'p', hit: { text: msg } } : m)));
     }
   };
@@ -184,7 +184,7 @@ export default function Pilot({ onClose }) {
           {photo ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
               <Image source={{ uri: photo.uri }} style={{ width: 54, height: 54, borderRadius: 8, borderWidth: 1.5, borderColor: '#1F2A44' }} />
-              <T kind="small" style={{ flex: 1, marginLeft: 10 }}>Photo attached — ask about it, or just send.</T>
+              <T kind="small" style={{ flex: 1, marginLeft: 10 }}>Photo attached. Ask about it, or just send.</T>
               <Pressable onPress={() => setPhoto(null)} hitSlop={10} accessibilityLabel="Remove photo"><Icon name="close" color={t.ink} /></Pressable>
             </View>
           ) : null}
@@ -192,12 +192,12 @@ export default function Pilot({ onClose }) {
             <Pressable onPress={pickPhoto} accessibilityLabel="Ask about a photo" style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginRight: 6 }}>
               <Icon name="camera" size={20} color={t.ink} />
             </Pressable>
-            <TextInput style={{ flex: 1, fontSize: 16, color: t.ink, paddingVertical: 6 }} placeholder={photo ? 'What do you want to know?' : 'Ask Pilot…'} placeholderTextColor={t.faint} value={input} onChangeText={setInput} onSubmitEditing={() => ask()} returnKeyType="send" maxLength={500} />
+            <TextInput style={{ flex: 1, fontSize: 16, color: t.ink, paddingVertical: 6 }} placeholder={photo ? 'What do you want to know?' : 'Ask Pilot…'} placeholderTextColor={t.faint} value={input} onChangeText={setInput} onSubmitEditing={() => ask()} returnKeyType="send" maxLength={1800} />
             <Pressable onPress={() => ask()} accessibilityLabel="Send" style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: t.highlight, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#1F2A44' }}>
               <Icon name="send" size={18} color="#1F2A44" />
             </Pressable>
           </View>
-          <T kind="small" style={{ fontSize: 11, marginTop: 6, textAlign: 'center' }}>{Math.max(0, limit - usedToday)} live answers left today · Photo help explains steps, it won't just hand you answers · Pilot can be wrong.</T>
+          <T kind="small" style={{ fontSize: 11, marginTop: 6, textAlign: 'center' }}>{Math.max(0, limit - usedToday)} live answers left today · Homework help walks you through it step by step · Pilot can be wrong.</T>
         </View>
       )}>
       <ScrollView ref={scroller} style={{ height: 420 }} contentContainerStyle={{ paddingBottom: 10 }} keyboardShouldPersistTaps="handled">
@@ -205,6 +205,7 @@ export default function Pilot({ onClose }) {
           <View>
             <T kind="hand" style={{ marginBottom: 8 }}>try one of these:</T>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+              <Chip label="Snap a homework problem" icon="camera" onPress={pickPhoto} />
               {SUGGESTIONS.map((s) => <Chip key={s} label={s} onPress={() => ask(s)} />)}
             </View>
           </View>

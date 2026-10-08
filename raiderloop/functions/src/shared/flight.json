@@ -10,6 +10,7 @@
   ],
   "caps": { "checkInsPerDay": 10, "pointsPerWeek": 300, "meetupBonusesPerDay": 3 },
   "radiusM": 150,
+  "autoDwellMin": 5,
   "maxAccuracyM": 75,
   "gameWindow": { "beforeMin": 120, "afterMin": 240 },
   "eventWindow": { "beforeMin": 30, "afterMin": 180 },

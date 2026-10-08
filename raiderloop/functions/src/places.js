@@ -17,6 +17,7 @@
 const { onCall } = require('firebase-functions/v2/https');
 const C = require('./common');
 const S = require('./socialCore');
+const M = require('./meetupCore');
 const {
   PLACES, RULES, P, placeById, levelFor, liveGameAt, checkPosition, applyPoints, stampPlace,
 } = require('./placesCore');
@@ -26,7 +27,7 @@ const { db, FieldValue, HttpsError, clean } = C;
 exports.checkIn = onCall(C.callOpts(), async (request) => {
   const uid = C.requireAuth(request, { account: true });
   const d = request.data || {};
-  await C.takeQuota(uid, 'checkinTry', 40, "That's a lot of check-in attempts today — try again tomorrow.");
+  await C.takeQuota(uid, 'checkinTry', 40, "That's a lot of check-in attempts today. Try again tomorrow.");
   const now = Date.now();
   let place = null; let tier = null; let key = null; let label = null;
 
@@ -53,27 +54,92 @@ exports.checkIn = onCall(C.callOpts(), async (request) => {
   }
   checkPosition(place, d);
   const routine = Array.isArray(d.classBuildingIds) && d.classBuildingIds.includes(place.id);
+  const result = await stampAt(uid, { place, tier, key, label, routine, now });
+  return result;
+});
 
+/* Stamps a place inside a transaction, with the daily and weekly caps.
+   Automatic check-ins (auto: true) never use up the daily limit on a
+   visit that earns nothing, and stop quietly instead of erroring. */
+async function stampAt(uid, { place, tier, key, label, routine, now, auto = false }) {
   const ref = db.doc(`flight/${uid}`);
   const result = await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const f = snap.exists ? snap.data() : {};
     const day = C.chicagoDay(now);
     const dayCount = f.ciDay === day ? (f.ciCount || 0) : 0;
-    if (dayCount >= RULES.caps.checkInsPerDay) throw new HttpsError('resource-exhausted', `That's ${RULES.caps.checkInsPerDay} check-ins today — the limit. Tomorrow's a new page.`);
+    if (dayCount >= RULES.caps.checkInsPerDay) {
+      if (auto) return { pts: 0, isNew: false, score: f.score || 0, capped: true, dayCapped: true };
+      throw new HttpsError('resource-exhausted', `That's ${RULES.caps.checkInsPerDay} check-ins today. That's the limit, and tomorrow's a new page.`);
+    }
     const { want, stamps, isNew } = stampPlace(f, place, { tier, key, routine, now });
     const { pts, patch } = applyPoints(f, want, now);
     const claimed = key ? { ...(f.claimed || {}), [key]: now } : (f.claimed || {});
-    tx.set(ref, { ...patch, ciDay: day, ciCount: dayCount + 1, stamps, claimed, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    const counts = !auto || pts > 0 || isNew;
+    tx.set(ref, { ...patch, ...(counts ? { ciDay: day, ciCount: dayCount + 1 } : {}), stamps, claimed, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
     return { pts, isNew, score: patch.score, capped: pts < want };
   });
   const lvl = levelFor(result.score);
   let message;
-  if (routine && tier !== 'game' && tier !== 'event') message = `${place.name} is one of your class buildings, so it's on your map but earns no points.`;
+  if (result.dayCapped) message = `That's ${RULES.caps.checkInsPerDay} check-ins today. Tomorrow's a new page.`;
+  else if (routine && tier !== 'game' && tier !== 'event') message = `${place.name} is one of your class buildings, so it's on your map but earns no points.`;
   else if (result.pts > 0) message = `+${result.pts} at ${place.name}${label ? ` (${label})` : ''}`;
-  else if (result.capped) message = "You've hit this week's point cap — the stamp still counts.";
+  else if (result.capped) message = "You've hit this week's point cap. The stamp still counts.";
   else message = `Already stamped ${place.name}${tier === 'rec' ? ' today' : ''}. Try somewhere new!`;
   return { ...result, title: lvl.title, next: lvl.next, placeId: place.id, placeName: place.name, tier, message };
+}
+
+/* A live event at this place right now, if the events feed has one
+   with a real start time whose check-in window is open. */
+async function liveEventAt(place, now) {
+  const cache = await db.collection('cache').doc('events').get();
+  const events = (cache.exists && cache.data().value) || [];
+  const name = place.name.toLowerCase();
+  return events.find((ev) => {
+    if (!ev || !ev.startsAt || !ev.id) return false;
+    const start = Date.parse(ev.startsAt);
+    if (!(now >= start - RULES.eventWindow.beforeMin * 60000 && now <= start + RULES.eventWindow.afterMin * 60000)) return false;
+    const loc = String(ev.location || '').toLowerCase();
+    return loc && (loc.includes(name) || name.includes(loc));
+  }) || null;
+}
+
+/* ---------- Automatic check-ins ----------
+   The phone (with "Always" location on) notices you've spent a few
+   minutes at a place on the list and sends that place plus one
+   location reading. The server checks the distance and decides what it
+   counts as: a game, a live event, the place itself, and any meetup
+   you accepted there. */
+exports.autoCheckIn = onCall(C.callOpts(), async (request) => {
+  const uid = C.requireAuth(request, { account: true });
+  const d = request.data || {};
+  await C.takeQuota(uid, 'autoCheckin', 120, 'Too many automatic check-ins today.');
+  const now = Date.now();
+  const place = placeById(clean(d.placeId, 80));
+  if (!place) throw new HttpsError('not-found', "That place isn't on the check-in list.");
+  checkPosition(place, d);
+  const routine = Array.isArray(d.classBuildingIds) && d.classBuildingIds.includes(place.id);
+
+  let tier = place.tier; let key = null; let label = null;
+  const game = liveGameAt(place.id, now);
+  if (game) { tier = 'game'; key = `game:${game.kickoff}`; label = `vs. ${game.opponent}`; } else {
+    const ev = await liveEventAt(place, now).catch(() => null);
+    if (ev) {
+      const f = (await db.doc(`flight/${uid}`).get()).data() || {};
+      if (!(f.claimed || {})[`event:${ev.id}`]) { tier = 'event'; key = `event:${ev.id}`; label = ev.title; }
+    }
+  }
+  const stamp = await stampAt(uid, { place, tier, key, label, routine, now, auto: true });
+
+  // Any meetup I accepted at this place that's happening now.
+  const meetups = [];
+  const ms = await db.collection('meetups').where('members', 'array-contains', uid).get();
+  for (const doc of ms.docs) {
+    const m = doc.data();
+    if (m.placeId !== place.id || (m.status || {})[uid] !== 'going' || (m.checkedIn || {})[uid] || !M.meetupOpen(m, now)) continue;
+    try { meetups.push({ id: doc.id, ...(await M.arriveAtMeetup(uid, doc.id, place, now)) }); } catch (e) { /* canceled or closed meanwhile */ }
+  }
+  return { ...stamp, meetups };
 });
 
 exports.setFlightPrefs = onCall(C.callOpts(), async (request) => {
@@ -150,7 +216,7 @@ exports.rateBuilding = onCall(C.callOpts(), async (request) => {
   const res = await db.runTransaction(async (tx) => {
     const [fs, ms, ss] = await Promise.all([tx.get(flightRef), tx.get(mineRef), tx.get(sumsRef)]);
     const f = fs.exists ? fs.data() : {};
-    if (!(f.stamps || {})[place.id]) throw new HttpsError('failed-precondition', `Check in at ${place.name} first — only people who've been there can rate it.`);
+    if (!(f.stamps || {})[place.id]) throw new HttpsError('failed-precondition', `Check in at ${place.name} first. Only people who've been there can rate it.`);
     const sums = ss.exists ? ss.data() : {};
     const c = { ...(sums[cat] || {}) };
     const prev = ms.exists ? (ms.data()[cat] || null) : null;

@@ -13,9 +13,10 @@ import { PermanentMarker_400Regular } from '@expo-google-fonts/permanent-marker'
 import { AppProvider, useApp } from './src/state/AppContext';
 import { ThemeProvider } from './src/theme/ThemeContext';
 import Shell from './src/Shell';
-// Defines the background task for nearby alerts. iOS can launch the app
+// Defines the background location task (automatic check-ins and
+// nearby alerts). iOS can launch the app
 // just to run it, so it has to be registered at startup.
-import './src/lib/nearby';
+import './src/lib/backgroundLocation';
 
 function Themed({ fontsLoaded }) {
   const { theme } = useApp();

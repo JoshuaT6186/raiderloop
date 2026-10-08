@@ -28,7 +28,7 @@ FIND YOUR PEOPLE
 • Live events and campus headlines
 • Add friends by scanning their QR code, and draw your own doodle avatar
 • Message friends, or start a flock (a small group chat) with up to 15 friends
-• Send meetup cards: pick a public campus spot and a time, then check in together
+• Send meetup cards: pick a public campus spot and a time, and Flyer checks you in when you're both there
 • Share your schedule (just free/busy, or full) with the friends you choose, and find a time everyone's free
 • Find classmates in your section (verified TTU students only, opt-in)
 • Share where you are (like at a game) with only the friends you pick, for as long as you choose. Turn it off instantly anytime.
@@ -52,7 +52,7 @@ Terms: [your terms URL] · Privacy: [your privacy URL]
 ## App Privacy ("nutrition label")
 - **Contact Info → Email address:** App Functionality; linked to user; not tracking
 - **Contact Info → Name:** App Functionality; linked
-- **Location → Precise location:** App Functionality (friend sharing, check-ins, only when the user acts); linked; not tracking
+- **Location → Precise location:** App Functionality (friend sharing, automatic check-ins after the user turns them on); linked; not tracking
 - **Location → Coarse location:** App Functionality (nearby alerts, opt-in); linked; not tracking
 - **User Content → Emails or text messages:** App Functionality (chat); linked
 - **User Content → Photos or videos:** App Functionality (chat photos, Pilot photos); linked
@@ -67,7 +67,7 @@ Terms: [your terms URL] · Privacy: [your privacy URL]
 >
 > **User-generated content (Guideline 1.2):** messages and photos are only between accepted friends (or a flock made of friends). Text is filtered for objectionable words; photos are checked by an automated safety filter before anyone can see them. Every message has Report, Hide, and Block (press and hold a message). Every person has Report and Block (their profile, class lists, and chat info). Reported content is reviewed within 24 hours; a message reported by two people is hidden immediately. Terms of use state zero tolerance for objectionable content. Messages auto-delete after 30 days.
 >
-> **Background location (Guideline 5.1.1/2.5.4):** used only by "Nearby alerts", which is off by default and turned on in Friends → Sharing. It tells two friends who BOTH opted in that they're close by on campus. No one is shown anyone's location. All other location use is while the app is open (check-ins and optional live sharing).
+> **Background location (Guideline 5.1.1/2.5.4):** used by two opt-in features, both off by default. (1) Automatic check-ins for flight score, turned on in You → Flight passport: the phone compares its location with a list of campus places on the device, and only after the user has stayed at one for about 5 minutes does it send that place and one reading to confirm the visit. Coordinates and routes are not stored. Flight score is cosmetic and only works with this on. (2) Nearby alerts, turned on in Friends → Sharing: tells two friends who BOTH opted in that they're close by on campus. No one is shown anyone's location. Optional live sharing runs only while the app is open.
 >
 > **Account deletion (5.1.1(v)):** You → Settings → Delete account. It deletes all server data and the sign-in, and revokes Sign in with Apple tokens.
 >

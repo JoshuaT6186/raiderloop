@@ -47,9 +47,14 @@ function ProfileCard() {
           <Pressable onPress={() => setMajor(true)}><PT kind="small">{metaLine(userClassYear, userMajor || 'Add your major')}</PT></Pressable>
           <PT kind="small">{school?.short}</PT>
           {profile?.handle ? (
-            <Pressable onPress={() => shareText(`Add me on Flyer! My friend code is ${profile.handle}`)} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
-              <PT kind="bold">@{profile.handle}</PT><Icon name="share" size={14} color="#1F2A44" style={{ marginLeft: 4 }} />
-            </Pressable>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
+              <Pressable onPress={() => setSheet({ type: 'handle' })} hitSlop={8} accessibilityLabel="Change your username" style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <PT kind="bold">@{profile.handle}</PT><Icon name="pencil" size={13} color="#1F2A44" style={{ marginLeft: 4 }} />
+              </Pressable>
+              <Pressable onPress={() => shareText(`Add me on Flyer! My username is @${profile.handle}`)} hitSlop={8} accessibilityLabel="Share your username" style={{ marginLeft: 12 }}>
+                <Icon name="share" size={15} color="#1F2A44" />
+              </Pressable>
+            </View>
           ) : user && user.isAnonymous ? (
             <Pressable onPress={() => setSheet({ type: 'account' })}><PT kind="bold" style={{ marginTop: 6, color: '#2F5DA8' }}>Make an account to add friends →</PT></Pressable>
           ) : null}
@@ -126,7 +131,7 @@ function PlusCard() {
   if (isPlus) {
     return (
       <PostIt color="yellow" seed="plus-on" style={{ marginTop: 18 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}><Icon name="crown" color="#B7791F" /><PT kind="bold" style={{ marginLeft: 8 }}>Flyer Plus is on — thank you for supporting a student-built app.</PT></View>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}><Icon name="crown" color="#B7791F" /><PT kind="bold" style={{ marginLeft: 8 }}>Flyer Plus is on. Thank you for supporting a student-built app.</PT></View>
       </PostIt>
     );
   }

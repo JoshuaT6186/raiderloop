@@ -104,7 +104,7 @@ export default function ClassForm({ existing, onSave, onRemove, onClose }) {
         </View>
       )}
       <Field label="Room (optional)" placeholder="e.g. 00077" value={room} onChangeText={setRoom} style={{ marginTop: 12 }} />
-      <Field label="Section (optional)" placeholder="e.g. 012 — matches you with your exact section" value={section} onChangeText={setSection} autoCapitalize="characters" maxLength={6} />
+      <Field label="Section (optional)" placeholder="e.g. 012. Matches you with your exact section" value={section} onChangeText={setSection} autoCapitalize="characters" maxLength={6} />
     </Sheet>
   );
 }

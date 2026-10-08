@@ -59,11 +59,11 @@ export default function Finals() {
             const ex = findExam(grid, c);
             return (
               <Row key={c.id} title={c.title} last={i === classes.length - 1}
-                meta={ex ? metaLine(ex.examDate, ex.examTime) : `${(c.days || []).join('/')} ${c.time} — no grid match (could be a common final or arranged exam)`}
+                meta={ex ? metaLine(ex.examDate, ex.examTime) : `${(c.days || []).join('/')} ${c.time} · no grid match (could be a common final or arranged exam)`}
                 right={ex ? <Stamp label="Found" color={t.ok} /> : null} />
             );
           })}
-          <T kind="small" style={{ marginTop: 8 }}>Always confirm with your syllabus — some classes use common finals or arranged times.</T>
+          <T kind="small" style={{ marginTop: 8 }}>Always confirm with your syllabus. Some classes use common finals or arranged times.</T>
         </Card>
       ) : null}
       {finals.data?.sourceUrl ? <T kind="small" color={t.accent} style={{ marginTop: 8 }} onPress={() => openUrl(finals.data.sourceUrl)}>Source: official TTU schedule</T> : null}

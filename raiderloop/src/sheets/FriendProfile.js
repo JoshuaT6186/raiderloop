@@ -84,7 +84,7 @@ export function FriendSheet({ uid, onClose }) {
       <Divider />
       <T kind="tiny" style={{ marginBottom: 6 }}>What {name} can see of your schedule</T>
       <ShareLevelPicker uid={uid} />
-      <T kind="small">Free / busy shows only when you're in class — no class names or buildings. Changing this is quiet; {name} isn't notified.</T>
+      <T kind="small">Free / busy shows only when you're in class. No class names or buildings. Changing this is quiet; {name} isn't notified.</T>
 
       <Divider />
       <Row title="Share my live location" meta="Only while Flyer is open; set times in Friends → Sharing" right={<Toggle value={locOn} onChange={() => set((p) => ({ sharing: { ...p.sharing, allowed: locOn ? p.sharing.allowed.filter((x) => x !== uid) : [...p.sharing.allowed, uid] } }))} label={`Share location with ${name}`} />} />
@@ -92,7 +92,7 @@ export function FriendSheet({ uid, onClose }) {
 
       <Divider />
       <Row title="Remove friend" left={<Icon name="userPlus" color={t.redPen} />} onPress={() => Alert.alert(`Remove ${name}?`, "They aren't told. Anything you shared with them stops right away.", [{ text: 'Cancel', style: 'cancel' }, { text: 'Remove', style: 'destructive', onPress: () => run(() => api.removeFriend({ uid }).then(onClose), 'Removed') }])} />
-      <Row title="Report" left={<Icon name="report" color={t.redPen} />} onPress={() => run(() => api.reportContent({ uid, reason: 'Reported from profile', kind: 'user' }), 'Reported — thanks')} />
+      <Row title="Report" left={<Icon name="report" color={t.redPen} />} onPress={() => run(() => api.reportContent({ uid, reason: 'Reported from profile', kind: 'user' }), 'Reported. Thanks!')} />
       <Row title="Block" left={<Icon name="close" color={t.redPen} />} onPress={() => Alert.alert(`Block ${name}?`, "They won't be able to find, add, or message you. They aren't told.", [{ text: 'Cancel', style: 'cancel' }, { text: 'Block', style: 'destructive', onPress: () => run(() => api.blockUser({ uid }).then(onClose), 'Blocked') }])} last />
     </Sheet>
   );

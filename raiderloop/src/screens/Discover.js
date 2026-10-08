@@ -142,7 +142,7 @@ export function OrgBrowser({ initial, onClose }) {
           right={followedOrgIds.includes(o.id) ? <Icon name="check" color={t.ok} size={18} /> : null}
           onPress={() => setSheet({ type: 'org', id: o.id })} last={i === Math.min(list.length, 120) - 1} />
       ))}
-      {list.length > 120 ? <T kind="small" style={{ marginTop: 8 }}>Showing 120 — search to narrow it down.</T> : null}
+      {list.length > 120 ? <T kind="small" style={{ marginTop: 8 }}>Showing 120. Search to narrow it down.</T> : null}
       {!list.length ? <Empty icon="users" title={cat === 'Following' ? "You're not following any clubs yet" : 'No orgs match that'} /> : null}
     </Sheet>
   );
@@ -201,7 +201,7 @@ export function SportsSheet({ onClose }) {
     ? FOOTBALL_SCHEDULE.map((g) => ({ opponent: g.opponent, date: gameDateLabel(g.kickoff), homeAway: g.homeAway, venue: g.venue, result: g.result }))
     : (live.data || []);
   return (
-    <Sheet title="Red Raider sports" hand={sport === 'Football' ? 'Verified 2026 schedule' : 'Pulled live from schedule pages'} onClose={onClose}>
+    <Sheet title="Red Raider sports" hand={sport === 'Football' ? 'Verified 2026 schedule' : 'Upcoming games'} onClose={onClose}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
         {SPORTS_LIST.map((s) => <Chip key={s} label={s} active={sport === s} onPress={() => setSport(s)} />)}
       </ScrollView>
@@ -210,7 +210,7 @@ export function SportsSheet({ onClose }) {
         <Row key={`${g.opponent}-${i}`} title={`${g.homeAway === 'away' ? 'at' : 'vs.'} ${g.opponent}`} meta={metaLine(g.date, g.time, g.venue)} last={i === rows.length - 1}
           right={g.result ? <Stamp label={g.result} color={/^W/.test(g.result) ? t.ok : t.redPen} /> : null} />
       ))}
-      {!live.loading && !rows.length ? <Empty icon="trophy" title="No published schedule found yet." /> : null}
+      {!live.loading && !rows.length ? <Empty icon="trophy" title="No upcoming dates published yet." /> : null}
     </Sheet>
   );
 }
@@ -246,7 +246,7 @@ export default function Discover() {
 
           <Section title="Sports" icon="trophy" action="schedules" onAction={() => setSheet({ type: 'sports' })} />
           <Card onPress={() => setSheet({ type: 'sports' })}>
-            <T kind="body">Football, basketball, baseball and more — full schedules in one place.</T>
+            <T kind="body">Football, volleyball, soccer and more.</T>
           </Card>
 
           <Section title="Study spots" icon="book" />

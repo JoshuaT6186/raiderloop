@@ -41,7 +41,7 @@ npx expo install react-native-svg react-native-maps react-native-safe-area-conte
   expo-tracking-transparency expo-dev-client @react-native-async-storage/async-storage \
   @expo-google-fonts/nunito @expo-google-fonts/caveat @expo-google-fonts/permanent-marker \
   react-native-google-mobile-ads react-native-purchases @bacons/apple-targets firebase \
-  expo-camera expo-task-manager expo-constants expo-image-manipulator react-native-qrcode-svg
+  expo-camera expo-task-manager expo-constants expo-image-manipulator react-native-qrcode-svg expo-document-picker expo-file-system
 ```
 
 Then update `app.json` for the camera, background location (nearby alerts only), and photo permissions. This keeps your EAS project ID:

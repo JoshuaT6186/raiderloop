@@ -1,0 +1,214 @@
+{
+  "_note": "Hand-checked against texastech.com news releases (Big 12 slates, Aug 19 women's basketball release). Only dates actually published are listed; times are left out until announced. Soccer and volleyball list the remaining conference matches; women's basketball lists the non-conference games. Edit this file and redeploy functions to add or correct games. Games before today are hidden automatically.",
+  "sports": {
+    "Soccer": [
+      {
+        "date": "2026-10-08",
+        "opponent": "Oklahoma State",
+        "homeAway": "away",
+        "venue": null,
+        "time": null
+      },
+      {
+        "date": "2026-10-11",
+        "opponent": "TCU",
+        "homeAway": "away",
+        "venue": null,
+        "time": null
+      },
+      {
+        "date": "2026-10-16",
+        "opponent": "BYU",
+        "homeAway": "away",
+        "venue": null,
+        "time": null
+      },
+      {
+        "date": "2026-10-22",
+        "opponent": "West Virginia",
+        "homeAway": "home",
+        "venue": "John Walker Soccer Complex",
+        "time": null
+      },
+      {
+        "date": "2026-10-25",
+        "opponent": "Utah",
+        "homeAway": "away",
+        "venue": null,
+        "time": null
+      },
+      {
+        "date": "2026-10-30",
+        "opponent": "Baylor",
+        "homeAway": "home",
+        "venue": "John Walker Soccer Complex",
+        "time": null
+      },
+      {
+        "date": "2026-11-05",
+        "opponent": "Kansas",
+        "homeAway": "away",
+        "venue": null,
+        "time": null
+      }
+    ],
+    "Volleyball": [
+      {
+        "date": "2026-10-08",
+        "opponent": "Baylor",
+        "homeAway": "home",
+        "venue": "United Supermarkets Arena",
+        "time": null
+      },
+      {
+        "date": "2026-10-16",
+        "opponent": "TCU",
+        "homeAway": "away",
+        "venue": null,
+        "time": null
+      },
+      {
+        "date": "2026-10-18",
+        "opponent": "Houston",
+        "homeAway": "away",
+        "venue": null,
+        "time": null
+      },
+      {
+        "date": "2026-10-23",
+        "opponent": "UCF",
+        "homeAway": "home",
+        "venue": "United Supermarkets Arena",
+        "time": null
+      },
+      {
+        "date": "2026-10-25",
+        "opponent": "Kansas State",
+        "homeAway": "away",
+        "venue": null,
+        "time": null
+      },
+      {
+        "date": "2026-11-01",
+        "opponent": "Colorado",
+        "homeAway": "away",
+        "venue": null,
+        "time": null
+      },
+      {
+        "date": "2026-11-06",
+        "opponent": "Arizona State",
+        "homeAway": "home",
+        "venue": "United Supermarkets Arena",
+        "time": null
+      },
+      {
+        "date": "2026-11-08",
+        "opponent": "Arizona",
+        "homeAway": "home",
+        "venue": "United Supermarkets Arena",
+        "time": null
+      },
+      {
+        "date": "2026-11-12",
+        "opponent": "Utah",
+        "homeAway": "away",
+        "venue": null,
+        "time": null
+      },
+      {
+        "date": "2026-11-14",
+        "opponent": "BYU",
+        "homeAway": "away",
+        "venue": null,
+        "time": null
+      },
+      {
+        "date": "2026-11-19",
+        "opponent": "Kansas State",
+        "homeAway": "home",
+        "venue": "United Supermarkets Arena",
+        "time": null
+      },
+      {
+        "date": "2026-11-22",
+        "opponent": "Houston",
+        "homeAway": "home",
+        "venue": "United Supermarkets Arena",
+        "time": null
+      },
+      {
+        "date": "2026-11-25",
+        "opponent": "Cincinnati",
+        "homeAway": "away",
+        "venue": null,
+        "time": null
+      },
+      {
+        "date": "2026-11-27",
+        "opponent": "West Virginia",
+        "homeAway": "away",
+        "venue": null,
+        "time": null
+      }
+    ],
+    "Women's Basketball": [
+      {
+        "date": "2026-10-18",
+        "opponent": "Angelo State (exhibition)",
+        "homeAway": "home",
+        "venue": "United Supermarkets Arena",
+        "time": null
+      },
+      {
+        "date": "2026-11-05",
+        "opponent": "UNC Charlotte",
+        "homeAway": "home",
+        "venue": "United Supermarkets Arena",
+        "time": null
+      },
+      {
+        "date": "2026-11-09",
+        "opponent": "Lamar",
+        "homeAway": "home",
+        "venue": "United Supermarkets Arena",
+        "time": null
+      },
+      {
+        "date": "2026-11-13",
+        "opponent": "Auburn",
+        "homeAway": "home",
+        "venue": "United Supermarkets Arena",
+        "time": null
+      },
+      {
+        "date": "2026-11-15",
+        "opponent": "Southeastern Louisiana",
+        "homeAway": "home",
+        "venue": "United Supermarkets Arena",
+        "time": null
+      },
+      {
+        "date": "2026-12-01",
+        "opponent": "Texas Southern",
+        "homeAway": "home",
+        "venue": "United Supermarkets Arena",
+        "time": null
+      },
+      {
+        "date": "2026-12-13",
+        "opponent": "Mississippi State",
+        "homeAway": "away",
+        "venue": null,
+        "time": null
+      },
+      {
+        "date": "2026-12-16",
+        "opponent": "North Florida",
+        "homeAway": "home",
+        "venue": "United Supermarkets Arena",
+        "time": null
+      }
+    ]
+  }
+}

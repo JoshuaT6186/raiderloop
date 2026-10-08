@@ -11,7 +11,7 @@ import Avatar from '../ui/Avatar';
 import { useTheme } from '../theme/ThemeContext';
 import { useApp } from '../state/AppContext';
 import { api, errText } from '../lib/firebase';
-import { meetupCheckIn } from '../lib/flight';
+import { AutoCheckInNote } from './PlaceExtras';
 import { PLACES, placeById, FLIGHT } from '../data/places';
 
 const W = FLIGHT.meetupWindow;
@@ -108,7 +108,7 @@ export function MeetupNewSheet({ placeId: initialPlace, to: initialTo, flockId, 
       </View>
       <WhenPicker value={at} onChange={setAt} />
       <Field label="Note (optional)" placeholder="Bring the practice problems" value={note} onChangeText={setNote} maxLength={140} style={{ marginTop: 10 }} />
-      <T kind="small">When you're both there, tap "I'm here" ({W.beforeMin} min before to {W.afterMin} min after). You each get +{FLIGHT.points.meetup} flight score, or +{FLIGHT.points.meetupBig} at the Rec or a game.</T>
+      <T kind="small">When you're both there ({W.beforeMin} min before to {W.afterMin} min after), Flyer checks you in automatically. You each get +{FLIGHT.points.meetup} flight score, or +{FLIGHT.points.meetupBig} at the Rec or a game.</T>
     </Sheet>
   );
 }
@@ -160,8 +160,7 @@ export function MeetupSheet({ id, onClose }) {
     try { await fn(); } catch (e) { showToast(errText(e)); }
     setBusy(null);
   };
-  const respond = (answer, at) => act(answer, async () => { await api.respondMeetup({ id, answer, at: at ? new Date(at).toISOString() : undefined }); showToast(answer === 'going' ? "You're in" : answer === 'declined' ? 'Declined — they aren\'t notified' : 'New time sent'); setReschedule(null); });
-  const here = () => act('here', async () => { const r = await meetupCheckIn(id); showToast(r.message); });
+  const respond = (answer, at) => act(answer, async () => { await api.respondMeetup({ id, answer, at: at ? new Date(at).toISOString() : undefined }); showToast(answer === 'going' ? "You're in" : answer === 'declined' ? 'Declined. They aren\'t notified.' : 'New time sent'); setReschedule(null); });
   const cancel = () => act('cancel', async () => { await api.cancelMeetup({ id }); showToast(m.from === me ? 'Meetup canceled' : "You're out"); onClose(); });
   const place = placeById(m.placeId);
 
@@ -176,20 +175,19 @@ export function MeetupSheet({ id, onClose }) {
               <Button title="Decline" small kind="ghost" loading={busy === 'declined'} onPress={() => respond('declined')} style={{ flex: 1 }} />
             </View>
           ) : mine === 'going' && phase === 'open' ? (
-            <Button title="I'm here" icon="check" kind="highlight" loading={busy === 'here'} disabled={!!m.checkedIn?.[me]} onPress={here} />
+            m.checkedIn?.[me] ? <T kind="bold" color={t.ok} style={{ textAlign: 'center' }}>You're checked in ✓</T> : <AutoCheckInNote text={`Flyer checks you in automatically once you're at ${m.placeName}.`} />
           ) : mine === 'going' ? (
             <Button title="Suggest another time" kind="ghost" onPress={() => setReschedule(m.atMs)} />
           ) : null}
         </View>
       )}>
-      {m.note ? <PostIt color="yellow" seed={m.id} tape><PT>"{m.note}"</PT><PT kind="small" style={{ marginTop: 4 }}>— {m.fromName}</PT></PostIt> : null}
+      {m.note ? <PostIt color="yellow" seed={m.id} tape><PT>"{m.note}"</PT><PT kind="small" style={{ marginTop: 4 }}>From {m.fromName}</PT></PostIt> : null}
       <T kind="tiny" style={{ marginTop: 14, marginBottom: 6 }}>Who's coming</T>
       {(m.members || []).map((u, i) => (
         <Row key={u} title={nameOf(u)} meta={m.checkedIn?.[u] ? 'Here ✓' : STATUS[m.status?.[u]] || ''} last={i === m.members.length - 1}
           right={m.awarded?.[u] ? <T kind="bold" color={t.ok}>+{m.awarded[u]}</T> : null} />
       ))}
-      {phase === 'upcoming' ? <T kind="small" style={{ marginTop: 10 }}>"I'm here" opens {W.beforeMin} minutes before and closes {W.afterMin} minutes after the meetup.</T> : null}
-      {phase === 'open' && mine === 'going' && !m.checkedIn?.[me] ? <T kind="small" style={{ marginTop: 10 }}>Tap "I'm here" once you're at {m.placeName}. Flyer checks your location once, right then.</T> : null}
+      {phase === 'upcoming' ? <T kind="small" style={{ marginTop: 10 }}>Flyer checks everyone in automatically from {W.beforeMin} minutes before to {W.afterMin} minutes after the meetup.</T> : null}
       {reschedule ? (
         <View style={{ marginTop: 14 }}>
           <T kind="tiny" style={{ marginBottom: 6 }}>Suggest a new time</T>

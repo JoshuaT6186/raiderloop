@@ -5,10 +5,11 @@
  */
 const { onCall } = require('firebase-functions/v2/https');
 const C = require('./common');
+const SPORTS = require('./shared/sports.json');
 
 const { db, HttpsError, ANTHROPIC_API_KEY, TAVILY_API_KEY, HOUR } = C;
 const BOTH = [ANTHROPIC_API_KEY, TAVILY_API_KEY];
-const LIMITS = { pilotFree: 25, pilotPlus: 150, scans: 5, lookups: 80, photosFree: 5, photosPlus: 20 };
+const LIMITS = { pilotFree: 25, pilotPlus: 150, scans: 5, lookups: 80, photosFree: 5, photosPlus: 20, syllabus: 6 };
 
 /* ---------------- Pilot ---------------- */
 async function pilot(request) {
@@ -17,44 +18,48 @@ async function pilot(request) {
   const hasImage = !!(image && typeof image.base64 === 'string' && image.base64.length > 100);
   const q = String(question || '').trim() || (hasImage ? 'Help me understand this.' : '');
   if (!q) throw new HttpsError('invalid-argument', 'Ask a question first.');
-  if (q.length > 600) throw new HttpsError('invalid-argument', 'That question is a bit long — try a shorter one.');
+  if (q.length > 2000) throw new HttpsError('invalid-argument', 'That question is too long. Try a shorter one.');
   const plus = await C.isPlus(uid);
   if (hasImage) {
-    if (image.base64.length > 6_600_000) throw new HttpsError('invalid-argument', 'That photo is too large — try again a little farther back.');
+    if (image.base64.length > 6_600_000) throw new HttpsError('invalid-argument', 'That photo is too large. Try again from farther back.');
     await C.takeQuota(uid, 'pilotPhoto', plus ? LIMITS.photosPlus : LIMITS.photosFree,
-      plus ? "That's today's photo questions — they reset at midnight." : `That's all ${LIMITS.photosFree} free photo questions for today — they reset at midnight, or Flyer Plus gives you ${LIMITS.photosPlus}.`);
+      plus ? "That's all of today's photo questions. They reset at midnight." : `That's all ${LIMITS.photosFree} free photo questions for today. They reset at midnight, or Flyer Plus gives you ${LIMITS.photosPlus}.`);
   }
   await C.takeQuota(uid, 'pilot', plus ? LIMITS.pilotPlus : LIMITS.pilotFree,
-    plus ? "You've reached today's question limit. It resets at midnight." : `That's all ${LIMITS.pilotFree} free questions for today — they reset at midnight, or Flyer Plus gives you ${LIMITS.pilotPlus} a day.`);
+    plus ? "You've reached today's question limit. It resets at midnight." : `That's all ${LIMITS.pilotFree} free questions for today. They reset at midnight, or Flyer Plus gives you ${LIMITS.pilotPlus} a day.`);
 
-  const tutor = hasImage ? `
+  const photoNote = hasImage ? `
+The student attached a photo (a worksheet, a problem, notes, a textbook page, a whiteboard or an essay prompt). Read it carefully first. If part of it is blurry or cut off, say exactly what you can't read and ask for a clearer shot before guessing. If the photo isn't schoolwork, just answer helpfully about what's in it.` : '';
 
-The student attached a photo (notes, a worksheet, a textbook page, a whiteboard, a problem). Act like a good tutor:
-- Explain the idea and walk through the method step by step so they can do it themselves.
-- For anything that looks like graded work (homework, a quiz, a take-home exam), do NOT just hand over final answers. Show how to approach it, work a similar example, or check their own attempt.
-- If the photo is blurry or cut off, say what you can't read and ask for a clearer shot.
-- If the photo isn't schoolwork, just answer helpfully about what's in it.
-- You may use up to 8 short sentences or a short numbered list for steps.` : '';
+  const system = `You are Pilot, the assistant inside Flyer, an independent, student-built campus app (not affiliated with or endorsed by any university). You help a Texas Tech University student in Lubbock, TX.
 
-  const system = `You are Pilot, the assistant inside Flyer — an independent, student-built campus app (not affiliated with or endorsed by any university). You help a Texas Tech University student in Lubbock, TX.
+There are two kinds of questions. Decide which one this is.
 
-First answer from the real data in <context>. If the answer isn't there but is a real-world fact a live search could find (deadlines, office hours, current events, policies), call search_web instead of guessing. If neither gives a verified answer, say so plainly and point to where they can check. Never invent a building, room, time, event, phone number, deadline, or organization detail.
+CAMPUS AND EVERYDAY QUESTIONS (what's open, where a class is, events, deadlines, policies):
+- First answer from the real data in the CONTEXT section below. If the answer isn't there but is a real-world fact a live search could find (deadlines, office hours, current events, policies), call search_web instead of guessing. If neither gives a verified answer, say so plainly and point to where they can check.
+- Never invent a building, room, time, event, phone number, deadline, or organization detail.
+- Keep these short: 1-3 sentences, friendly.
 
-For anything about safety or an emergency, tell them to call 911 first.
+SCHOOLWORK (homework problems, studying, concepts, essays). Be a patient, thorough tutor:
+- Homework and problems: say in one line what the problem is asking and which idea it uses. Then walk through it as numbered steps using their actual numbers or text. In each step, show the work and explain why you do it, in plain words a freshman would follow. Point out the common mistake to avoid. If it looks like graded work (homework, a quiz, a take-home exam), take them through every step of the method but stop right before the final answer, tell them exactly what the last step is, and offer to check their answer. If they share their own answer, say whether it's right. If it's wrong, point to the exact step that went wrong and let them redo it, without giving the final answer for graded work. If it's clearly practice or studying, you can finish it and explain the result.
+- Concepts and studying: explain simply first, then give a short example, then one quick practice question they can try.
+- Essays and papers: help them start, don't write it for them. Give 2 or 3 possible thesis statements, a simple outline (intro, 3 body points with what evidence could support each, conclusion), and one sample opening paragraph clearly labeled as a starting point to rewrite in their own words. If the prompt or assignment requirements aren't clear, ask for them. Offer to give feedback on paragraphs they write. Never write a whole essay.
+- Schoolwork answers can be longer (up to about 350 words). Put each step on its own line starting with "1.", "2.", and so on.
 
-Keep answers short: 1-3 sentences, friendly, plain text (no markdown headings).${tutor}
+Always: plain text only, no markdown symbols like ** or #. Write math in plain text (x^2, sqrt(x), 3/4). Never use em dashes; use a period, comma or colon instead. For anything about safety or an emergency, tell them to call 911 first.${photoNote}
 
+CONTEXT (the student's own app data):
 <context>
 ${String(context || '').slice(0, 24000)}
 </context>`;
 
   const tools = [{
     name: 'search_web',
-    description: 'Search the live web for current, real information not in the context — deadlines, current office holders, campus news, hours, or anything that could have changed recently.',
+    description: 'Search the live web for current, real information not in the context: deadlines, current office holders, campus news, hours, or anything that could have changed recently.',
     input_schema: { type: 'object', properties: { query: { type: 'string', description: 'A short, specific search query.' } }, required: ['query'] },
   }];
 
-  const prior = Array.isArray(history) ? history.slice(-6).filter((m) => m && m.text).map((m) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.text).slice(0, 800) })) : [];
+  const prior = Array.isArray(history) ? history.slice(-6).filter((m) => m && m.text).map((m) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.text).slice(0, m.role === 'assistant' ? 3000 : 2000) })) : [];
   // The API requires alternating roles starting with user.
   const msgs = [];
   for (const m of prior) { if (!msgs.length && m.role !== 'user') continue; if (msgs.length && msgs[msgs.length - 1].role === m.role) continue; msgs.push(m); }
@@ -65,7 +70,8 @@ ${String(context || '').slice(0, 24000)}
     { type: 'text', text: q },
   ] : q });
 
-  const maxTokens = hasImage ? 900 : 450;
+  // Schoolwork walkthroughs need room; campus answers stay short by instruction.
+  const maxTokens = hasImage ? 2000 : 1500;
   let data = await C.callClaude({ system, messages: msgs, maxTokens, tools });
   const toolUse = (data.content || []).find((b) => b.type === 'tool_use');
   let sources = [];
@@ -75,14 +81,15 @@ ${String(context || '').slice(0, 24000)}
     const summary = (results.results || []).map((r) => `${r.title} (${r.url}): ${r.content}`.slice(0, 500)).join('\n\n') || 'No results found.';
     msgs.push({ role: 'assistant', content: data.content });
     msgs.push({ role: 'user', content: [{ type: 'tool_result', tool_use_id: toolUse.id, content: summary }] });
-    data = await C.callClaude({ system, messages: msgs, maxTokens, tools });
+    // One search per question: the follow-up must answer in text.
+    data = await C.callClaude({ system, messages: msgs, maxTokens, tools, toolChoice: { type: 'none' } });
   }
   const text = (data.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim()
     || "I don't have verified information on that yet.";
   return { text, sources };
 }
 
-exports.askPilot = onCall({ ...C.callOpts(BOTH), memory: '512MiB', timeoutSeconds: 90 }, pilot);
+exports.askPilot = onCall({ ...C.callOpts(BOTH), memory: '512MiB', timeoutSeconds: 150 }, pilot);
 /* Old RaiderLoop builds call askRed — keep it working until they update. */
 exports.askRed = onCall(C.callOpts(BOTH), pilot);
 
@@ -91,9 +98,9 @@ exports.parseSchedule = onCall({ ...C.callOpts([ANTHROPIC_API_KEY]), memory: '51
   const uid = C.requireAuth(request);
   const { imageBase64, mediaType } = request.data || {};
   if (!imageBase64 || typeof imageBase64 !== 'string') throw new HttpsError('invalid-argument', 'No image was sent.');
-  if (imageBase64.length > 7_000_000) throw new HttpsError('invalid-argument', 'That image is too large — try a regular screenshot.');
+  if (imageBase64.length > 7_000_000) throw new HttpsError('invalid-argument', 'That image is too large. Try a regular screenshot.');
   const okTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
-  await C.takeQuota(uid, 'scan', LIMITS.scans, "You've scanned 5 schedules today — that's the daily limit. You can still add classes by hand.");
+  await C.takeQuota(uid, 'scan', LIMITS.scans, "You've scanned 5 schedules today, the daily limit. You can still add classes by hand.");
 
   const system = `Extract a class schedule from this screenshot of a university registration/schedule page.
 Return ONLY a JSON array, nothing else. Each entry:
@@ -108,6 +115,84 @@ If you can't confidently read a field, omit that entry. If the image isn't a sch
     maxTokens: 1200,
   });
   return { classes: C.parseJsonArray(text).slice(0, 15) };
+});
+
+/* ---------------- Syllabus scan ----------------
+   Photos of the pages (up to 6) or a PDF → every dated assignment,
+   quiz, exam and project. The app shows the list for the student to
+   check before anything is added, because a missed or wrong due date
+   is worse than none. Only dates actually written in the syllabus come
+   back — "Week 5" without a calendar date is skipped, never guessed. */
+const KINDS = ['assignment', 'quiz', 'exam', 'project', 'other'];
+function termContext() {
+  const [y, m] = C.chicagoDay().split('-').map(Number);
+  // Students scan next term's syllabus early (spring in December,
+  // fall in summer), so offer the current term and the next one.
+  const terms = m >= 8 ? [`Fall ${y}`, `Spring ${y + 1}`] : m <= 5 ? [`Spring ${y}`, `Summer ${y}`, `Fall ${y}`] : [`Summer ${y}`, `Fall ${y}`];
+  return { today: C.chicagoDay(), terms };
+}
+const realDate = (s) => {
+  if (!/^20\d\d-\d\d-\d\d$/.test(String(s))) return false;
+  const [y, m, d] = s.split('-').map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d));
+  return t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === d;
+};
+
+exports.parseSyllabus = onCall({ ...C.callOpts([ANTHROPIC_API_KEY]), memory: '1GiB', timeoutSeconds: 240 }, async (request) => {
+  const uid = C.requireAuth(request);
+  const { pages, pdf } = request.data || {};
+  const okTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+  const content = [];
+  if (typeof pdf === 'string' && pdf.length > 100) {
+    if (pdf.length > 8_500_000) throw new HttpsError('invalid-argument', 'That PDF is too large. Try screenshots of the pages with due dates instead.');
+    content.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdf } });
+  } else if (Array.isArray(pages) && pages.length) {
+    const list = pages.slice(0, 6).filter((p) => p && typeof p.base64 === 'string' && p.base64.length > 100);
+    const total = list.reduce((n, p) => n + p.base64.length, 0);
+    if (total > 8_500_000) throw new HttpsError('invalid-argument', 'Those photos are too large together. Try fewer pages.');
+    list.forEach((p) => content.push({ type: 'image', source: { type: 'base64', media_type: okTypes.includes(p.mediaType) ? p.mediaType : 'image/jpeg', data: p.base64 } }));
+  }
+  if (!content.length) throw new HttpsError('invalid-argument', 'Pick photos of your syllabus or a PDF first.');
+  await C.takeQuota(uid, 'syllabus', LIMITS.syllabus, `That's ${LIMITS.syllabus} syllabus scans today. The limit resets at midnight. You can still add assignments by hand.`);
+
+  const { today, terms } = termContext();
+  const system = `You read a college course syllabus and list every graded item that has a due date or exam date.
+Today is ${today}. This syllabus is most likely for one of: ${terms.join(', ')}. If the syllabus names its term or year (e.g. "Spring 2027"), use that. Otherwise pick whichever of those terms its dates fit, and give every date the year of that term (Fall = Aug-Dec, Spring = Jan-May, Summer = Jun-Aug).
+
+Return ONLY a JSON object, nothing else:
+{ "course": string|null (course code as written, e.g. "MATH 1314"), "items": [ { "title": string (short, as the syllabus names it, e.g. "Exam 2", "Lab report 3"), "kind": "assignment"|"quiz"|"exam"|"project"|"other", "date": "YYYY-MM-DD", "time": "HH:MM" (24-hour) or null } ] }
+
+Rules:
+- Only include an item if the syllabus states its calendar date (or a schedule table row gives the date). If it only says "Week 5", "TBA" or "see Canvas", leave it out. Never estimate a date.
+- Include exams, quizzes, papers, projects, labs, presentations and homework that are due on specific dates. Skip readings and class topics that aren't due.
+- If a time is written (e.g. "due 11:59 PM"), include it; otherwise time is null.
+- If the same deadline rule applies to many dated items in a table, list each dated item.
+- Holidays and "no class" days are not items.
+- If the document isn't a syllabus or has no dated items, return { "course": null, "items": [] }.
+- Write compact JSON with no extra spaces or line breaks.`;
+  const text = await C.claudeText({
+    system,
+    messages: [{ role: 'user', content: [...content, { type: 'text', text: 'List the dated items as JSON.' }] }],
+    maxTokens: 10000,
+  });
+  const out = C.parseJsonObject(text);
+  if (!out) {
+    console.warn('parseSyllabus: unreadable reply', String(text).length);
+    throw new HttpsError('internal', "That syllabus was too long to read in one go. Try photos of just the schedule pages.");
+  }
+  const seen = new Set();
+  const items = (Array.isArray(out.items) ? out.items : []).map((i) => ({
+    title: C.clean(i && i.title, 80),
+    kind: KINDS.includes(i && i.kind) ? i.kind : 'other',
+    date: realDate(i && i.date) ? i.date : null,
+    time: /^([01]\d|2[0-3]):[0-5]\d$/.test(String(i && i.time)) ? i.time : null,
+  })).filter((i) => {
+    if (!i.title || !i.date) return false;
+    const k = `${i.title.toLowerCase().replace(/[^a-z0-9]/g, '')}|${i.date}`;
+    if (seen.has(k)) return false;
+    seen.add(k); return true;
+  }).slice(0, 100);
+  return { course: out.course ? C.clean(out.course, 40) : null, items };
 });
 
 /* ---------------- Cached live lookups ---------------- */
@@ -143,10 +228,10 @@ exports.getNews = onCall(C.callOpts(BOTH), async (request) => {
     const images = (results.images || []).slice(0, 8);
     const text = await C.claudeText({
       system: `Extract real, distinct news headlines about Texas Tech and Lubbock. Return ONLY a JSON array. Each:
-{ "headline": string, "source": string (real outlet name — never invent), "official": boolean (true only for "The Daily Toreador"), "byline": string|null, "date": string, "excerpt": string (one sentence, your own words), "url": string }
+{ "headline": string, "source": string (real outlet name, never invent), "official": boolean (true only for "The Daily Toreador"), "byline": string|null, "date": string, "excerpt": string (one sentence, your own words, no em dashes), "url": string }
 Only real stories with a real source and date. If none, return [].
 ${C.recencyGuard()}
-For news: a story from a previous year is not current. Recent stories (last few weeks) are fine — past tense is normal for news reporting.
+For news: a story from a previous year is not current. Recent stories (last few weeks) are fine. Past tense is normal for news reporting.
 
 SEARCH RESULTS:
 ${C.resultsText(results)}`,
@@ -161,6 +246,15 @@ exports.getSportsSchedule = onCall(C.callOpts(BOTH), async (request) => {
   await lookup(request);
   const sport = String((request.data || {}).sport || '').slice(0, 40);
   if (!sport) throw new HttpsError('invalid-argument', 'sport is required');
+  // Hand-checked games first (texastech.com schedule pages are script-rendered, so scraping them comes back empty).
+  const curated = (SPORTS.sports || {})[sport];
+  if (curated) {
+    const today = C.chicagoDay();
+    const rows = curated.filter((g) => g.date >= today).map((g) => ({
+      ...g, date: new Date(`${g.date}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }),
+    }));
+    return { schedule: rows, cached: false, verified: true };
+  }
   const key = `sports_${sport.toLowerCase().replace(/[^a-z]/g, '')}`;
   const { value, cached } = await C.cachedList(key, 24 * HOUR, 6 * HOUR, async () => {
     const results = await C.tavilySearch({ query: `Texas Tech ${sport} 2026-27 schedule`, maxResults: 6 });
@@ -182,7 +276,7 @@ exports.getDiningMenus = onCall(C.callOpts(BOTH), async (request) => {
   const { value, cached } = await C.cachedList('dining_menus', 12 * HOUR, 6 * HOUR, async () => {
     const results = await C.tavilySearch({ query: 'Texas Tech dining hall menu today Lubbock hospitality services', maxResults: 6 });
     const text = await C.claudeText({
-      system: `Extract real, current dining menu items for Texas Tech. Return ONLY a JSON array of { "hall": string, "items": string[] }. If the text has no real current menu, return [] — never guess typical food.
+      system: `Extract real, current dining menu items for Texas Tech. Return ONLY a JSON array of { "hall": string, "items": string[] }. If the text has no real current menu, return []. Never guess typical food.
 
 SEARCH RESULTS:
 ${C.resultsText(results)}`,
@@ -220,7 +314,7 @@ exports.enrichOrg = onCall(C.callOpts(BOTH), async (request) => {
   if (hit) return { ...hit, cached: true };
   const results = await C.tavilySearch({ query: `"${orgName}" Texas Tech University Instagram OR TechConnect`, includeImages: true, maxResults: 5 });
   const text = await C.claudeText({
-    system: `Given search results about a Texas Tech student organization called "${orgName}", return ONLY { "instagramUrl": string|null, "activeSignal": string|null }. Never invent a URL — null unless you're confident it's this specific org.
+    system: `Given search results about a Texas Tech student organization called "${orgName}", return ONLY { "instagramUrl": string|null, "activeSignal": string|null }. Never invent a URL. Use null unless you're confident it's this specific org.
 
 SEARCH RESULTS:
 ${C.resultsText(results)}`,

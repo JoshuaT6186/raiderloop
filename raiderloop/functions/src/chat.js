@@ -17,6 +17,7 @@ const C = require('./common');
 const S = require('./socialCore');
 const K = require('./chatCore');
 const F = require('./placesCore');
+const M = require('./meetupCore');
 
 const { db, FieldValue, HttpsError, clean, ANTHROPIC_API_KEY } = C;
 
@@ -79,15 +80,15 @@ exports.sendMessage = onCall({ ...C.callOpts([ANTHROPIC_API_KEY]), memory: '512M
     const other = chat.data.members.find((m) => m !== uid);
     if (!(await S.areFriends(uid, other)) || (await S.isBlocked(uid, other))) throw new HttpsError('permission-denied', 'You can only message friends.');
   }
-  await C.takeQuota(uid, 'msg', 500, "You've sent a lot of messages today — the limit resets at midnight.");
+  await C.takeQuota(uid, 'msg', 500, "You've sent a lot of messages today. The limit resets at midnight.");
   const msg = { from: uid };
   if (d.imagePath) {
-    await C.takeQuota(uid, 'photo', 20, "That's 20 photos today — the limit resets at midnight.");
+    await C.takeQuota(uid, 'photo', 20, "That's 20 photos today. The limit resets at midnight.");
     const path = String(d.imagePath);
     if (!path.startsWith(`chatImages/${chat.id}/${uid}/`) || path.includes('..')) throw new HttpsError('invalid-argument', 'Bad photo.');
     const file = K.bucket().file(path);
     const [exists] = await file.exists();
-    if (!exists) throw new HttpsError('not-found', "The photo didn't finish uploading — try again.");
+    if (!exists) throw new HttpsError('not-found', "The photo didn't finish uploading. Try again.");
     const [meta] = await file.getMetadata();
     if (Number(meta.size) > 4.5 * 1024 * 1024) { await file.delete().catch(() => {}); throw new HttpsError('invalid-argument', 'That photo is too big.'); }
     const [buf] = await file.download();
@@ -127,7 +128,7 @@ async function friendsOnly(uid, uids) {
 
 exports.createFlock = onCall(C.callOpts(), async (request) => {
   const uid = C.requireAuth(request, { account: true });
-  await C.takeQuota(uid, 'flockCreate', 5, "That's 5 new flocks today — try again tomorrow.");
+  await C.takeQuota(uid, 'flockCreate', 5, "That's 5 new flocks today. Try again tomorrow.");
   const name = s(request.data?.name, 40);
   if (name.length < 2) throw new HttpsError('invalid-argument', 'Give your flock a name.');
   const members = await friendsOnly(uid, Array.isArray(request.data?.members) ? request.data.members : []);
@@ -233,7 +234,6 @@ exports.setChatMute = onCall(C.callOpts(), async (request) => {
 });
 
 /* ---------- Meetups ---------- */
-const W = F.RULES.meetupWindow;
 
 function parseAt(v) {
   const ms = Date.parse(v);
@@ -245,10 +245,10 @@ function parseAt(v) {
 
 exports.createMeetup = onCall(C.callOpts(), async (request) => {
   const uid = C.requireAuth(request, { account: true });
-  await C.takeQuota(uid, 'meetup', 12, "That's a lot of meetup cards today — try again tomorrow.");
+  await C.takeQuota(uid, 'meetup', 12, "That's a lot of meetup cards today. Try again tomorrow.");
   const d = request.data || {};
   const place = F.placeById(clean(d.placeId, 80));
-  if (!place) throw new HttpsError('invalid-argument', 'Pick a place from the campus list — meetups are always somewhere public.');
+  if (!place) throw new HttpsError('invalid-argument', 'Pick a place from the campus list. Meetups are always somewhere public.');
   const atMs = parseAt(d.at);
   let invited; let chatId = null; let flockId = null;
   if (d.flockId) {
@@ -315,62 +315,19 @@ exports.cancelMeetup = onCall(C.callOpts(), async (request) => {
   return { ok: true };
 });
 
-/* Both (or all) people tap "I'm here" inside the window; the server
+/* Older app builds call this when someone taps "I'm here"; newer ones
+   check in automatically through autoCheckIn (places.js). The server
    checks each person's position once. When two or more have checked
    in, everyone who checked in gets the bonus. */
 exports.meetupCheckIn = onCall(C.callOpts(), async (request) => {
   const uid = C.requireAuth(request, { account: true });
   const d = request.data || {};
-  const now = Date.now();
-  const ref = db.doc(`meetups/${clean(d.id, 80)}`);
   const pre = await meetupFor(uid, d.id);
   const place = F.placeById(pre.data().placeId);
   if (!place) throw new HttpsError('not-found', 'That place is no longer on the list.');
   F.checkPosition(place, d);
-
-  const toAward = await db.runTransaction(async (tx) => {
-    const snap = await tx.get(ref);
-    if (!snap.exists) throw new HttpsError('not-found', 'That meetup was canceled.');
-    const m = snap.data();
-    if (m.status[uid] !== 'going') throw new HttpsError('failed-precondition', 'Accept the meetup first.');
-    if (now < m.atMs - W.beforeMin * 60000 || now > m.atMs + W.afterMin * 60000) {
-      throw new HttpsError('failed-precondition', `Check-in opens ${W.beforeMin} minutes before the meetup and closes ${W.afterMin} minutes after.`);
-    }
-    const checkedIn = { ...(m.checkedIn || {}), [uid]: now };
-    const awarded = { ...(m.awarded || {}) };
-    const ids = Object.keys(checkedIn);
-    const award = ids.length >= 2 ? ids.filter((u) => awarded[u] == null) : [];
-    award.forEach((u) => { awarded[u] = 0; });
-    tx.update(ref, { checkedIn, awarded });
-    return { award, ids, members: m.members };
-  });
-
-  const results = {};
-  for (const u of toAward.award) {
-    const others = toAward.ids.filter((x) => x !== u).sort().join(',');
-    const key = `${place.id}:${others}`;
-    const fref = db.doc(`flight/${u}`);
-    results[u] = await db.runTransaction(async (tx) => {
-      const fs = await tx.get(fref);
-      const f = fs.exists ? fs.data() : {};
-      const day = C.chicagoDay(now);
-      const count = f.meetupDay === day ? (f.meetupCount || 0) : 0;
-      let bonus = ['rec', 'game'].includes(place.tier) || F.liveGameAt(place.id, now) ? F.P.meetupBig : F.P.meetup;
-      const log = { ...(f.meetupLog || {}) };
-      if (log[key] && now - log[key] < 7 * 86400000) bonus = Math.floor(bonus / 2);
-      if (count >= F.RULES.caps.meetupBonusesPerDay) bonus = 0;
-      const st = F.stampPlace(f, place, { tier: place.tier, now });
-      const { pts, patch } = F.applyPoints(f, bonus + st.want, now);
-      log[key] = now;
-      tx.set(fref, { ...patch, stamps: st.stamps, meetupLog: log, meetupDay: day, meetupCount: count + 1 }, { merge: true });
-      return pts;
-    });
-    await ref.update({ [`awarded.${u}`]: results[u] });
-  }
-  const me = S.firstName((await S.publicCard(uid)).name) || 'A friend';
-  await C.sendPush(toAward.members.filter((u) => u !== uid && !toAward.ids.includes(u)), { title: `${me} is here`, body: `${place.name} — tap "I'm here" when you arrive.`, data: { open: 'meetup', meetupId: ref.id } });
-  if (results[uid] != null) return { ok: true, points: results[uid], message: results[uid] > 0 ? `Meetup made! +${results[uid]} flight score` : 'Meetup made! (No bonus left today.)' };
-  return { ok: true, points: 0, waiting: toAward.ids.length < 2, message: toAward.ids.length < 2 ? "You're checked in. The bonus lands when a friend checks in too." : 'Checked in.' };
+  const r = await M.arriveAtMeetup(uid, pre.id, place, Date.now());
+  return { ok: true, ...r };
 });
 
 /* ---------- Clean-up: expired messages, photos, old meetups ---------- */

@@ -64,7 +64,7 @@ export function AvatarStudio({ value, onChange, isPlus }) {
           <Icon name="refresh" size={18} color={t.accent} />
           <T kind="hand" color={t.accent} style={{ marginLeft: 6 }}>surprise me</T>
         </Pressable>
-        {usesLocked ? <T kind="small" color={t.warn} style={{ marginTop: 6 }}>★ items need Flyer Plus to save — they'll swap back if you continue.</T> : null}
+        {usesLocked ? <T kind="small" color={t.warn} style={{ marginTop: 6 }}>★ items need Flyer Plus to save. They'll swap back if you continue.</T> : null}
       </View>
 
       <View style={{ flexDirection: 'row', marginBottom: 14 }}>

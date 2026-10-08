@@ -54,7 +54,7 @@ export default function Grades() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
               {GRADE_OPTIONS.map((g) => <Chip key={g} label={g} active={c.grade === g} onPress={() => update(c.id, { grade: c.grade === g ? '' : g })} />)}
             </ScrollView>
-            {canvas?.score != null ? <T kind="small">Canvas current score: {canvas.score}% (≈ {scoreToLetter(canvas.score)} — your syllabus cutoffs may differ)</T> : null}
+            {canvas?.score != null ? <T kind="small">Canvas current score: {canvas.score}% (≈ {scoreToLetter(canvas.score)}, your syllabus cutoffs may differ)</T> : null}
           </Card>
         );
       })}
@@ -65,7 +65,7 @@ export default function Grades() {
         <Field label="GPA so far" placeholder="e.g. 3.42" value={priorGpa} onChangeText={(v) => set({ priorGpa: v.replace(/[^\d.]/g, '') })} keyboardType="decimal-pad" style={{ flex: 1, marginRight: 10 }} />
         <Field label="Credits so far" placeholder="e.g. 30" value={priorCredits} onChangeText={(v) => set({ priorCredits: v.replace(/[^\d.]/g, '') })} keyboardType="decimal-pad" style={{ flex: 1 }} />
       </View>
-      <T kind="small">Estimates only — your official GPA is the one on your transcript. Pass/fail, withdrawn, and incomplete courses don't count toward GPA.</T>
+      <T kind="small">Estimates only. Your official GPA is on your transcript. Pass/fail, withdrawn, and incomplete courses don't count toward GPA.</T>
     </View>
   );
 }

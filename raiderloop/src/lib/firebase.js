@@ -53,8 +53,8 @@ async function authReady() {
   await new Promise((resolve) => { const off = onAuthStateChanged(auth, () => { off(); resolve(); }); });
 }
 
-const call = (name, { guestOk = true } = {}) => {
-  const fn = httpsCallable(functions, name, { timeout: 95000 });
+const call = (name, { guestOk = true, timeout = 95000 } = {}) => {
+  const fn = httpsCallable(functions, name, { timeout });
   return async (data) => {
     await authReady();
     if (!auth.currentUser) {
@@ -69,8 +69,9 @@ const call = (name, { guestOk = true } = {}) => {
 const acct = (name) => call(name, { guestOk: false });
 
 export const api = {
-  askPilot: call('askPilot'),
+  askPilot: call('askPilot', { timeout: 160000 }),
   parseSchedule: call('parseSchedule'),
+  parseSyllabus: call('parseSyllabus', { timeout: 250000 }),
   getEvents: call('getEvents'),
   getNews: call('getNews'),
   getSportsSchedule: call('getSportsSchedule'),
@@ -93,6 +94,7 @@ export const api = {
   // account-only
   saveProfile: acct('saveProfile'),
   sendFriendRequest: acct('sendFriendRequest'),
+  setHandle: acct('setHandle'),
   respondFriendRequest: acct('respondFriendRequest'),
   removeFriend: acct('removeFriend'),
   blockUser: acct('blockUser'),
@@ -122,6 +124,7 @@ export const api = {
   respondMeetup: acct('respondMeetup'),
   cancelMeetup: acct('cancelMeetup'),
   meetupCheckIn: acct('meetupCheckIn'),
+  autoCheckIn: acct('autoCheckIn'),
   updateScheduleShare: acct('updateScheduleShare'),
   setNearbyPrefs: acct('setNearbyPrefs'),
   nearbyPing: acct('nearbyPing'),
@@ -129,7 +132,7 @@ export const api = {
 };
 
 /* Friendly text for a failed callable. */
-export const errText = (e, fallback = 'Something went wrong — try again.') => {
+export const errText = (e, fallback = 'Something went wrong. Try again.') => {
   const msg = e && e.message ? String(e.message).replace(/^.*?\): /, '') : '';
   if (!msg || /internal|INTERNAL/.test(msg)) return fallback;
   return msg;

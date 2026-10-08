@@ -97,7 +97,7 @@ export default function Classes() {
             </View>
           </View>
         );
-      }) : <Empty icon="sun" title={`Nothing on ${WEEK_DAY_FULL[day]}`} body="A free day — or add a class." action="Add a class" onAction={() => setForm('new')} />}
+      }) : <Empty icon="sun" title={`Nothing on ${WEEK_DAY_FULL[day]}`} body="A free day. Or add a class." action="Add a class" onAction={() => setForm('new')} />}
 
       <Section title="Tools" icon="pencil" />
       <ScanSchedule compact onConfirm={(items) => { items.forEach((i) => addClass(i)); showToast(`Added ${items.length} classes`); }} />

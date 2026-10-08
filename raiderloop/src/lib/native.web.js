@@ -15,6 +15,8 @@ function tryRequire(fn) {
 export const SvgLib = tryRequire(() => require('react-native-svg'));
 export const Maps = null;
 export const ImagePicker = tryRequire(() => require('expo-image-picker'));
+export const DocumentPicker = tryRequire(() => require('expo-document-picker'));
+export const FileSystem = null;
 export const Notifications = null;
 export const AsyncStorage = tryRequire(() => require('@react-native-async-storage/async-storage').default);
 export const Location = tryRequire(() => require('expo-location'));

@@ -32,7 +32,7 @@ function liveGameAt(placeId, now = Date.now()) {
 
 function checkPosition(place, d) {
   const lat = Number(d.lat); const lng = Number(d.lng);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) throw new HttpsError('invalid-argument', 'Location is off — turn it on for Flyer to check in.');
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) throw new HttpsError('invalid-argument', 'Turn on location for Flyer to check in.');
   const acc = Math.min(Math.max(Number(d.accuracy) || 0, 0), RULES.maxAccuracyM);
   const dist = C.distanceM({ lat, lng }, place);
   if (dist == null || dist > RULES.radiusM + acc) {
@@ -77,7 +77,7 @@ function stampPlace(f, place, { tier, key, routine, now = Date.now() }) {
   }
   stamps[place.id] = {
     name: place.name, tier: prev?.tier === 'game' ? 'game' : tier, first: prev?.first || now, lastDay: day,
-    visits: (prev?.visits || 0) + 1, routine: !!routine && !(tier === 'game' || tier === 'event'),
+    visits: (prev?.visits || 0) + (prev && prev.lastDay === day ? 0 : 1), routine: !!routine && !(tier === 'game' || tier === 'event'),
   };
   return { want, stamps, isNew };
 }

@@ -10,6 +10,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { useApp } from '../state/AppContext';
 import { api, errText } from '../lib/firebase';
 import { FLIGHT, levelFor, tierLabel, STAMP_COLORS, placeById } from '../data/places';
+import { AutoCheckInCard, DWELL_MIN } from './PlaceExtras';
 
 const SHORT = { game: 'GAME DAY', event: 'EVENT', rec: 'REC', spot: 'NEW SPOT', dining: 'DINING' };
 function Stamp({ s, onPress }) {
@@ -88,6 +89,7 @@ export default function PassportSheet({ onClose }) {
             </View>
             <PT kind="small" style={{ marginTop: 8 }}>{real.length} {real.length === 1 ? 'place' : 'places'} stamped · {week} of {FLIGHT.caps.pointsPerWeek} points this week</PT>
           </PostIt>
+          <AutoCheckInCard />
 
           <T kind="tiny" style={{ marginTop: 18, marginBottom: 8 }}>How to earn</T>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
@@ -98,21 +100,21 @@ export default function PassportSheet({ onClose }) {
               </View>
             ))}
           </View>
-          <T kind="small">Meetups with friends: +{FLIGHT.points.meetup} each (+{FLIGHT.points.meetupBig} at the Rec or a game). Rating a place: +{FLIGHT.points.rating}. Your class buildings don't count — they're your routine. Up to {FLIGHT.caps.checkInsPerDay} check-ins a day.</T>
-          <Row title="Find a place to check in" meta="Open the map and tap any building" left={<Icon name="campus" color={t.ink} />} onPress={() => { onClose(); setTab('campus'); }} last />
+          <T kind="small">Meetups with friends: +{FLIGHT.points.meetup} each (+{FLIGHT.points.meetupBig} at the Rec or a game). Rating a place: +{FLIGHT.points.rating}. Your class buildings don't count. They're your routine. Up to {FLIGHT.caps.checkInsPerDay} stamps a day.</T>
+          <Row title="Find somewhere new" meta="Open the map to see what you haven't stamped" left={<Icon name="campus" color={t.ink} />} onPress={() => { onClose(); setTab('campus'); }} last />
 
           <T kind="tiny" style={{ marginTop: 16, marginBottom: 10 }}>Your stamps</T>
           {stamps.length ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
               {stamps.map((s) => <Stamp key={s.id} s={s} onPress={() => { if (placeById(s.id)) { onClose(); goToBuilding(s.id); } }} />)}
             </View>
-          ) : <Empty icon="passport" title="No stamps yet" body="Walk into a building you've never been to, tap it on the map, and check in." />}
+          ) : <Empty icon="passport" title="No stamps yet" body={`Go somewhere you've never been on campus and stay about ${DWELL_MIN} minutes. Flyer stamps it for you.`} />}
 
           <Divider />
-          <Row title="Show my score to friends" meta="Just your total and title — never where you've been" right={<Toggle value={showScore} onChange={toggleShow} label="Show my score to friends" />} last />
+          <Row title="Show my score to friends" meta="Just your total and title. Never where you've been" right={<Toggle value={showScore} onChange={toggleShow} label="Show my score to friends" />} last />
           <T kind="tiny" style={{ marginTop: 14, marginBottom: 8 }}>Friend board</T>
           <Board />
-          <T kind="small" style={{ marginTop: 12 }}>Rewards are bragging rights: your title shows on the board, and it's all free. Check-ins use one location reading at the moment you tap — Flyer doesn't track you.</T>
+          <T kind="small" style={{ marginTop: 12 }}>Rewards are bragging rights: your title shows on the board, and it's all free. Automatic check-ins use your location in the background, but it only leaves your phone when you've stayed at a place on the list.</T>
         </>
       )}
     </Sheet>

@@ -24,14 +24,14 @@ export function RequestSchool({ onClose }) {
       )}>
       {state === 'sent' ? (
         <PostIt color="green" tilt={-1.5} tape>
-          <PT kind="title">Got it — thanks!</PT>
+          <PT kind="title">Got it, thanks!</PT>
           <PT kind="small">We'll count your vote for {school}. {email ? "We'll email you if it launches." : ''}</PT>
         </PostIt>
       ) : (
         <>
           <Field label="School name" placeholder="e.g. University of North Texas" value={school} onChangeText={setSchool} autoCapitalize="words" />
           <Field label="Email (optional)" placeholder="So we can tell you when it's live" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
-          {state === 'error' ? <T kind="small" color={t.redPen}>Couldn't send that — check your connection and try again.</T> : null}
+          {state === 'error' ? <T kind="small" color={t.redPen}>Couldn't send that. Check your connection and try again.</T> : null}
         </>
       )}
     </Sheet>

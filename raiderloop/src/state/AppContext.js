@@ -29,7 +29,7 @@ const DEFAULTS = {
   avatar: DEFAULT_AVATAR,
   interests: [],
   scheduleItems: [],
-  assignments: [], // { id, title, course, due (ISO), done, source: 'manual'|'canvas', url? }
+  assignments: [], // { id, title, course, due (ISO), done, source: 'manual'|'canvas'|'syllabus', url? }
   gradeCourses: [], // { id, name, credits, grade }
   priorGpa: '',
   priorCredits: '',
@@ -47,6 +47,7 @@ const DEFAULTS = {
   canvasCourses: [], // { name, score } from Canvas sync
   scheduleShare: { levels: {} }, // friendUid → 'busy' | 'full' (absent = off)
   nearby: { on: false, allow: [] }, // nearby-friend alerts (mutual opt-in)
+  flightAuto: false, // automatic check-ins for flight score (needs Always location)
   chatRead: {}, // chatId → ms of the last message I've seen
   sentRequests: [], // uids I've sent friend requests to (for "Requested")
   hiddenMsgs: [], // message ids I reported/hid

@@ -10,11 +10,11 @@ import { AppleAuth, Crypto } from '../../lib/native';
 
 const friendly = (e) => {
   const c = e?.code || '';
-  if (c.includes('email-already-in-use')) return 'That email already has an account — switch to "Sign in".';
+  if (c.includes('email-already-in-use')) return 'That email already has an account. Switch to "Sign in".';
   if (c.includes('invalid-email')) return "That email doesn't look right.";
   if (c.includes('weak-password')) return 'Use at least 6 characters for your password.';
   if (c.includes('invalid-credential') || c.includes('wrong-password') || c.includes('user-not-found')) return "Email or password didn't match.";
-  if (c.includes('network')) return "Can't reach the server — check your connection.";
+  if (c.includes('network')) return "Can't reach the server. Check your connection.";
   if (c.includes('canceled') || c.includes('ERR_REQUEST_CANCELED')) return null;
   return e?.message || 'Something went wrong.';
 };
@@ -90,7 +90,7 @@ export default function Account() {
         {mode === 'signin' ? (
           <Pressable hitSlop={8} onPress={async () => {
             if (!email) { setError('Type your email first, then tap this again.'); return; }
-            try { await resetPassword(email.trim()); setInfo('Reset link sent — check your inbox.'); } catch (e) { setError(friendly(e)); }
+            try { await resetPassword(email.trim()); setInfo('Reset link sent. Check your inbox.'); } catch (e) { setError(friendly(e)); }
           }}>
             <T kind="hand" color={t.pencil}>forgot password?</T>
           </Pressable>

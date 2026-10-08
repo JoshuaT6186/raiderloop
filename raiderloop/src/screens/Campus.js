@@ -21,7 +21,7 @@ import {
 } from '../data/campus';
 import { SCHOOLS } from '../config';
 import { placeById } from '../data/places';
-import { RatingSummary, useCheckIn } from '../sheets/PlaceExtras';
+import { RatingSummary } from '../sheets/PlaceExtras';
 
 const COLLAPSED = 250;
 const EXPANDED = SCREEN_H * 0.66;
@@ -39,7 +39,7 @@ function Tools() {
     <View>
       {game ? (
         <PostIt color="orange" tilt={-0.8} onPress={() => setSheet({ type: 'gameday', kickoff: game.kickoff })} style={{ marginBottom: 12 }} padding={10}>
-          <PT kind="bold">🏟️ Game day vs. {game.opponent} — share your spot with friends</PT>
+          <PT kind="bold">🏟️ Game day vs. {game.opponent}: share your spot with friends</PT>
         </PostIt>
       ) : null}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -62,7 +62,6 @@ function Tools() {
    quick Rate button — a full sheet only when you ask for details. */
 function SelectedCard({ b, onClose }) {
   const { setSheet } = useApp();
-  const { busy, run } = useCheckIn();
   const place = placeById(b.id);
   return (
     <PostIt color="yellow" tilt={-0.6} padding={12} fold={false} style={{ marginTop: 10 }}>
@@ -75,7 +74,6 @@ function SelectedCard({ b, onClose }) {
       </View>
       <View style={{ flexDirection: 'row', marginTop: 8 }}>
         {place ? <Button title="Rate" icon="star" small onPress={() => setSheet({ type: 'rate', placeId: b.id })} style={{ marginRight: 6 }} /> : null}
-        {place ? <Button title="I'm here" icon="check" small kind="ghost" loading={busy} onPress={() => run({ placeId: b.id })} style={{ marginRight: 6, backgroundColor: '#fff' }} /> : null}
         <Button title="Details" small kind="ghost" onPress={() => setSheet({ type: 'building', id: b.id })} style={{ backgroundColor: '#fff' }} />
       </View>
     </PostIt>
@@ -122,7 +120,9 @@ export default function Campus() {
           initialRegion={{ latitude: center.latitude - 0.004, longitude: center.longitude, latitudeDelta: 0.022, longitudeDelta: 0.022 }}>
           {list.slice(0, 120).map((b) => (
             <Marker key={b.id} coordinate={{ latitude: b.lat, longitude: b.lng }} onPress={() => setSelected(b)} tracksViewChanges={false}>
-              <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: isOpenNow(b.hours) === true ? t.postit.green : t.postit.yellow, borderWidth: 2, borderColor: '#1F2A44' }} />
+              <View style={{ width: 46, height: 46, alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{ width: 27, height: 27, borderRadius: 13.5, backgroundColor: isOpenNow(b.hours) === true ? t.postit.green : t.postit.yellow, borderWidth: 2.5, borderColor: '#1F2A44' }} />
+              </View>
             </Marker>
           ))}
           {BUS_STOPS.filter((s) => s.lat).map((s) => (

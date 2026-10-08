@@ -54,7 +54,7 @@ export function OpenNowSheet({ onClose }) {
           left={<Icon name={x.kind === 'Food' ? 'food' : x.kind === 'Study' ? 'book' : 'building'} color={t.ink} />}
           right={x.closesIn != null && x.closesIn <= 60 ? <Stamp label={`${x.closesIn}m left`} color={t.warn} /> : null}
           onPress={x.open} />
-      )) : <Empty icon="moon" title="Everything with posted hours is closed right now." body="Check back in the morning — or ask Pilot." />}
+      )) : <Empty icon="moon" title="Everything with posted hours is closed right now." body="Check back in the morning, or ask Pilot." />}
     </Sheet>
   );
 }
@@ -82,7 +82,7 @@ export function ParkingSheet({ onClose }) {
       {!live.loading && !lots.length ? (
         <PostIt color="yellow" seed="park-none" tape style={{ marginBottom: 12 }}>
           <PT kind="bold">No lot update posted yet today.</PT>
-          <PT kind="small" style={{ marginTop: 4 }}>Parking Services usually posts a few times on weekdays during the semester. Flyer only shows today's real numbers — never old ones.</PT>
+          <PT kind="small" style={{ marginTop: 4 }}>Parking Services usually posts a few times on weekdays during the semester. Flyer only shows today's real numbers, never old ones.</PT>
         </PostIt>
       ) : null}
       {(lots.length ? COMMUTER_LOTS : []).map((lot) => {
@@ -91,7 +91,7 @@ export function ParkingSheet({ onClose }) {
           <View key={lot} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }}>
             <View style={{ width: 54 }}><T kind="title">{lot}</T></View>
             {l ? <Meter pct={l.percentFull} /> : <T kind="small" style={{ flex: 1 }}>not in today's update</T>}
-            <T kind="num" style={{ width: 54, textAlign: 'right' }}>{l ? `${l.percentFull}%` : '—'}</T>
+            <T kind="num" style={{ width: 54, textAlign: 'right' }}>{l ? `${l.percentFull}%` : 'N/A'}</T>
           </View>
         );
       })}

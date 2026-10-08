@@ -30,4 +30,4 @@ export function scoreToLetter(score) {
   if (score >= 90) return 'A'; if (score >= 80) return 'B'; if (score >= 70) return 'C'; if (score >= 60) return 'D'; return 'F';
 }
 
-export const fmtGpa = (g) => (g == null ? '—' : g.toFixed(2));
+export const fmtGpa = (g) => (g == null ? 'N/A' : g.toFixed(2));

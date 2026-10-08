@@ -56,7 +56,7 @@ async function assignHandle(uid, name) {
       return handle;
     } catch (e) { /* try another */ }
   }
-  throw new HttpsError('internal', "Couldn't make a friend code — try again.");
+  throw new HttpsError('internal', "Couldn't make a username. Try again.");
 }
 
 exports.saveProfile = onCall(C.callOpts(), async (request) => {
@@ -67,31 +67,94 @@ exports.saveProfile = onCall(C.callOpts(), async (request) => {
   const ref = db.collection('users').doc(uid);
   const snap = await ref.get();
   let handle = snap.exists ? snap.data().handle : null;
-  if (!handle) handle = await assignHandle(uid, name);
+  // Only write the username when it's brand new — setHandle owns
+  // changes, and writing back a value read here could undo one.
+  const fresh = !handle;
+  if (fresh) handle = await assignHandle(uid, name);
   const verifiedEmail = S.verifiedSchoolEmail(request, schoolId);
-  await ref.set({ name, avatar, schoolId, handle, schoolVerified: !!verifiedEmail, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  await ref.set({ name, avatar, schoolId, ...(fresh ? { handle } : {}), schoolVerified: !!verifiedEmail, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
   // Refresh my card inside each friend's list and each chat I'm in.
   const friends = await ref.collection('friends').get();
   const batch = db.batch();
-  friends.docs.forEach((f) => batch.set(db.doc(`users/${f.id}/friends/${uid}`), { name, avatar, handle }, { merge: true }));
+  friends.docs.forEach((f) => batch.set(db.doc(`users/${f.id}/friends/${uid}`), { name, avatar }, { merge: true }));
   const chats = await db.collection('chats').where('members', 'array-contains', uid).limit(100).get();
   chats.docs.forEach((c) => batch.set(c.ref, { memberCards: { [uid]: { name, avatar } } }, { merge: true }));
   await batch.commit();
   return { handle, schoolVerified: !!verifiedEmail };
 });
 
+/* ---------- Choose your own @username ----------
+   Everyone gets one automatically (above); this lets them pick their
+   own. Lowercase letters, numbers and underscores, 3-20 long. Lookup is
+   exact-match only (sendFriendRequest) — there's no searchable list of
+   students. */
+const RESERVED = new Set(['flyer', 'flyerapp', 'admin', 'administrator', 'support', 'help', 'helpdesk', 'official', 'staff', 'mod', 'moderator',
+  'team', 'security', 'root', 'system', 'pilot', 'ttu', 'texastech', 'texas_tech', 'raider', 'raiders', 'redraider', 'redraiders', 'raiderred',
+  'masked_rider', 'maskedrider', 'sga', 'police', 'ttupd', 'president', 'eternityworks', 'apple', 'google', 'null', 'undefined', 'everyone', 'me', 'you']);
+
+function checkHandle(raw) {
+  const h = String(raw || '').trim().toLowerCase().replace(/^@/, '');
+  if (h.length < 3 || h.length > 20) return { error: 'Usernames are 3 to 20 characters.' };
+  if (!/^[a-z0-9_]+$/.test(h)) return { error: 'Use only letters, numbers and underscores.' };
+  if (/^[0-9_]+$/.test(h)) return { error: 'Include at least one letter.' };
+  if (/^_|_$|__/.test(h)) return { error: "Underscores can't be at the start, the end, or doubled." };
+  if (RESERVED.has(h) || /^(flyer|admin|support|official|ttu|texastech)/.test(h)) return { error: 'That one is reserved. Try another.' };
+  if (require('./chatCore').censorText(h.replace(/_/g, ' ')) !== h.replace(/_/g, ' ')) return { error: 'Pick a different username.' };
+  return { handle: h };
+}
+
+const HANDLE_HOLD_MS = 30 * 24 * 3600000;
+
+exports.setHandle = onCall(C.callOpts(), async (request) => {
+  const uid = C.requireAuth(request, { account: true });
+  const { handle, error } = checkHandle(request.data?.handle);
+  if (error) throw new HttpsError('invalid-argument', error);
+  const userRef = db.collection('users').doc(uid);
+  const pre = await userRef.get();
+  if (pre.exists && pre.data().handle === handle) return { handle };
+  await C.takeQuota(uid, 'handleChange', 5, "You've changed your username a few times today. Try again tomorrow.");
+  const newRef = db.collection('handles').doc(handle);
+  // Read everything inside the transaction so two quick changes can't
+  // both release the same old name and leave one of them orphaned.
+  await db.runTransaction(async (tx) => {
+    const [cur, taken] = await Promise.all([tx.get(userRef), tx.get(newRef)]);
+    const old = cur.exists ? cur.data().handle : null;
+    if (old === handle) return;
+    if (taken.exists) {
+      const t = taken.data();
+      const heldForOther = t.heldUntil && t.heldUntil > Date.now();
+      if (t.uid !== uid && (!t.heldUntil || heldForOther)) throw new HttpsError('already-exists', `@${handle} is taken. Try another.`);
+    }
+    tx.set(newRef, { uid });
+    // The old name is held for 30 days so nobody can grab it and
+    // receive requests meant for you. You can take it back meanwhile.
+    if (old) tx.set(db.collection('handles').doc(old), { uid, heldUntil: Date.now() + HANDLE_HOLD_MS });
+    tx.set(userRef, { handle, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  });
+  // Update my card in friends' lists and in requests I've sent.
+  const [friends, sent] = await Promise.all([
+    userRef.collection('friends').get(),
+    db.collectionGroup('requests').where('fromUid', '==', uid).limit(200).get(),
+  ]);
+  const batch = db.batch();
+  friends.docs.forEach((f) => batch.set(db.doc(`users/${f.id}/friends/${uid}`), { handle }, { merge: true }));
+  sent.docs.forEach((r) => batch.set(r.ref, { handle }, { merge: true }));
+  await batch.commit();
+  return { handle };
+});
+
 /* ---------- Friends: requests by @handle ---------- */
 exports.sendFriendRequest = onCall(C.callOpts(), async (request) => {
   const uid = C.requireAuth(request, { account: true });
-  await C.takeQuota(uid, 'friendReq', 40, "You've sent a lot of requests today — try again tomorrow.");
+  await C.takeQuota(uid, 'friendReq', 40, "You've sent a lot of requests today. Try again tomorrow.");
   let target = clean(request.data?.uid, 64);
   if (!target) {
     const handle = clean(request.data?.handle, 30).toLowerCase().replace(/^@/, '');
     const h = handle ? await db.collection('handles').doc(handle).get() : null;
-    if (!h || !h.exists) throw new HttpsError('not-found', `No one has the code @${handle}. Check the spelling.`);
+    if (!h || !h.exists || h.data().heldUntil) throw new HttpsError('not-found', `No one has the username @${handle}. Check the spelling.`);
     target = h.data().uid;
   }
-  if (target === uid) throw new HttpsError('invalid-argument', "That's your own code!");
+  if (target === uid) throw new HttpsError('invalid-argument', "That's your own username!");
   if (await S.areFriends(uid, target)) throw new HttpsError('already-exists', "You're already friends.");
   // Blocked looks identical to "sent" — no signal either way.
   if (await S.isBlocked(uid, target)) return { ok: true };
@@ -158,7 +221,7 @@ const normCode = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '').
 
 exports.createFriendCode = onCall(C.callOpts(), async (request) => {
   const uid = C.requireAuth(request, { account: true });
-  await C.takeQuota(uid, 'friendCode', 80, "That's a lot of new codes today — try again tomorrow.");
+  await C.takeQuota(uid, 'friendCode', 80, "That's a lot of new codes today. Try again tomorrow.");
   const kind = request.data?.kind === 'link' ? 'link' : 'qr';
   const ttl = kind === 'link' ? 24 * 3600000 : 5 * 60000;
   const token = newToken(8);
@@ -169,14 +232,14 @@ exports.createFriendCode = onCall(C.callOpts(), async (request) => {
 
 exports.redeemFriendCode = onCall(C.callOpts(), async (request) => {
   const uid = C.requireAuth(request, { account: true });
-  await C.takeQuota(uid, 'friendRedeem', 40, "That's a lot of codes today — try again tomorrow.");
+  await C.takeQuota(uid, 'friendRedeem', 40, "That's a lot of codes today. Try again tomorrow.");
   const code = normCode(request.data?.code);
   const snap = code.length >= 6 ? await db.doc(`friendCodes/${code}`).get() : null;
-  const bad = new HttpsError('not-found', "That code didn't work. Codes expire — ask them to show a fresh one.");
+  const bad = new HttpsError('not-found', "That code didn't work. Codes expire. Ask them to show a fresh one.");
   if (!snap || !snap.exists) throw bad;
   const d = snap.data();
   if (d.expiresAt < Date.now()) throw bad;
-  if (d.uid === uid) throw new HttpsError('invalid-argument', "That's your own code!");
+  if (d.uid === uid) throw new HttpsError('invalid-argument', "That's your own username!");
   if (await S.isBlocked(uid, d.uid)) throw bad;
   const card = await S.publicCard(d.uid);
   if (await S.areFriends(uid, d.uid)) return { ok: true, already: true, name: card.name };

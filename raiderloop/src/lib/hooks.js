@@ -93,10 +93,10 @@ export function forecastAt(hourly, date) {
 /** A short, useful heads-up for walking to class — or null. */
 export function weatherNote(f) {
   if (!f) return null;
-  if (f.code >= 95) return `Storms around then (${f.temp}°) — give yourself extra time.`;
-  if (f.rain >= 40) return `${f.rain}% chance of rain — grab an umbrella.`;
-  if (f.temp <= 45) return `It'll be ${f.temp}° — bring a jacket.`;
-  if (f.temp >= 97) return `It'll be ${f.temp}° — bring water.`;
+  if (f.code >= 95) return `Storms around then (${f.temp}°). Leave early.`;
+  if (f.rain >= 40) return `${f.rain}% chance of rain. Grab an umbrella.`;
+  if (f.temp <= 45) return `It'll be ${f.temp}°. Bring a jacket.`;
+  if (f.temp >= 97) return `It'll be ${f.temp}°. Bring water.`;
   return null;
 }
 

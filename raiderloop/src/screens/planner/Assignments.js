@@ -25,7 +25,7 @@ function group(list) {
 const COLORS = { Overdue: 'pink', Today: 'yellow', 'This week': 'blue', Later: 'green', Done: 'lavender' };
 
 export default function Assignments() {
-  const { assignments, updateAssignment } = useApp();
+  const { assignments, updateAssignment, setSheet } = useApp();
   const [form, setForm] = useState(null);
   const [showDone, setShowDone] = useState(false);
   const sorted = [...assignments].filter((a) => a.due).sort((a, b) => new Date(a.due) - new Date(b.due));
@@ -36,7 +36,8 @@ export default function Assignments() {
     <View>
       <CanvasCard />
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 16 }}>
-        <T kind="hand" style={{ flex: 1 }}>{open ? `${open} to do` : 'nothing due — nice'}</T>
+        <T kind="hand" style={{ flex: 1 }}>{open ? `${open} to do` : 'nothing due, nice'}</T>
+        <Button title="Scan syllabus" icon="scan" small kind="ghost" onPress={() => setSheet({ type: 'syllabus' })} style={{ marginRight: 8 }} />
         <Button title="Add" icon="plus" small onPress={() => setForm('new')} />
       </View>
       {Object.entries(g).filter(([k, v]) => v.length && (k !== 'Done' || showDone)).map(([k, v]) => (
@@ -60,7 +61,7 @@ export default function Assignments() {
           </PostIt>
         </View>
       ))}
-      {!sorted.length ? <Empty icon="clipboard" title="No assignments yet" body="Add what's due and Flyer will remind you the day before and two hours before." action="Add assignment" onAction={() => setForm('new')} /> : null}
+      {!sorted.length ? <Empty icon="clipboard" title="No assignments yet" body="Scan a syllabus to load every due date at once, or add them one by one. Flyer reminds you the day before and two hours before." action="Scan a syllabus" onAction={() => setSheet({ type: 'syllabus' })} /> : null}
       {g.Done.length ? <Button title={showDone ? 'Hide finished' : `Show ${g.Done.length} finished`} kind="ghost" small onPress={() => setShowDone(!showDone)} style={{ marginTop: 14 }} /> : null}
       {form ? <AssignmentForm existing={form === 'new' ? null : form} onClose={() => setForm(null)} /> : null}
     </View>
