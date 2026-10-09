@@ -2,7 +2,8 @@
  * Money: ads, Flyer Plus, affiliate links.
  * ------------------------------------------------------------
  * Rules this file enforces:
- *  • Ads start on Google's TEST IDs (config.ADS.useTestIds).
+ *  • config.ADS.useTestIds switches between Google's test ads and the
+ *    real ad unit. Release builds use the real unit: never tap your own ads.
  *  • iOS asks App Tracking Transparency once; if declined, ads are
  *    non-personalized. Either way nothing about location, schedule
  *    or friends is ever passed to an ad network.
@@ -15,6 +16,9 @@ import { MobileAds, Tracking, Purchases } from './native';
 import { ADS, PURCHASES, AFFILIATE } from '../config';
 
 let adsReady = false; let personalized = false;
+/* Banners listen for init finishing, so one rendered too early still shows. */
+const adsListeners = new Set();
+function setAdsReady(v) { adsReady = v; adsListeners.forEach((f) => f(v)); }
 
 export async function initAds({ askTracking }) {
   if (!MobileAds || !ADS.enabled) return;
@@ -31,13 +35,18 @@ export async function initAds({ askTracking }) {
       maxAdContentRating: MobileAds.MaxAdContentRating?.T || 'T',
     });
     await MobileAds.default().initialize();
-    adsReady = true;
-  } catch (e) { adsReady = false; }
+    setAdsReady(true);
+  } catch (e) { setAdsReady(false); }
 }
 
 export function BannerAd({ isPlus, style }) {
   const [failed, setFailed] = useState(false);
-  if (isPlus || !MobileAds || !ADS.enabled || !adsReady || failed) return null;
+  const [ready, setReady] = useState(adsReady);
+  useEffect(() => {
+    adsListeners.add(setReady); setReady(adsReady);
+    return () => { adsListeners.delete(setReady); };
+  }, []);
+  if (isPlus || !MobileAds || !ADS.enabled || !ready || failed) return null;
   const { BannerAd: GBanner, BannerAdSize, TestIds } = MobileAds;
   const unitId = ADS.useTestIds ? TestIds.ADAPTIVE_BANNER || TestIds.BANNER : Platform.select({ ios: ADS.bannerIos, android: ADS.bannerAndroid });
   return (
@@ -61,6 +70,7 @@ export async function initPurchases(appUserId) {
   try {
     if (!purchasesReady) { Purchases.configure({ apiKey, appUserID: appUserId || null }); purchasesReady = true; }
     else if (appUserId) await Purchases.logIn(appUserId);
+    else if (!(await Purchases.isAnonymous())) await Purchases.logOut(); // a guest never inherits the last account's Plus
     return true;
   } catch (e) { return false; }
 }
@@ -91,6 +101,7 @@ export async function buyPlus(pkg) {
 }
 
 export async function restorePlus() {
+  if (!purchasesAvailable()) throw new Error("Flyer Plus isn't available yet. Check back soon.");
   const info = await Purchases.restorePurchases();
   return !!info.entitlements.active[PURCHASES.entitlement];
 }
@@ -99,13 +110,21 @@ export function usePlusStatus(user, onChange) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      await initPurchases(user && !user.isAnonymous ? user.uid : null);
+      const ok = await initPurchases(user && !user.isAnonymous ? user.uid : null);
+      if (!ok) return;
       const plus = await checkPlus();
       if (!cancelled && plus !== null) onChange(plus);
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.uid]);
+  }, [user?.uid, user?.isAnonymous]);
+}
+
+/* On sign-out / delete: forget the RevenueCat user so the next person
+   on this phone doesn't get their Plus. */
+export async function logOutPurchases() {
+  if (!purchasesAvailable()) return;
+  try { if (!(await Purchases.isAnonymous())) await Purchases.logOut(); } catch (e) { /* already anonymous */ }
 }
 
 /* ---------- Affiliate ---------- */

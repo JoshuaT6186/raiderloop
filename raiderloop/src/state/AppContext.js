@@ -12,7 +12,7 @@ import { APP } from '../config';
 import {
   onAuth, listenMyProfile, listenFriends, listenRequests, listenFriendLocations, listenBlocked, listenFlight, listenMeetups, listenChats,
 } from '../lib/firebase';
-import { sortByTime, todayCode, overlaps, uid } from '../lib/time';
+import { sortByTime, todayCode, overlaps, uid, localDay, isStaleOneOff } from '../lib/time';
 import { buildingById } from '../data/campus';
 import { DEFAULT_AVATAR } from '../ui/avatarParts';
 
@@ -49,13 +49,28 @@ const DEFAULTS = {
   chatRead: {}, // chatId → ms of the last message I've seen
   sentRequests: [], // uids I've sent friend requests to (for "Requested")
   hiddenMsgs: [], // message ids I reported/hid
+  dataOwner: null, // uid of the account the personal data below belongs to
+  pendingInvite: null, // friend code from an invite link, redeemed once signed in
 };
 const PERSIST_KEYS = Object.keys(DEFAULTS).filter((k) => k !== 'onboardStep');
+
+/* Personal data that lives only on this phone. Signing out keeps it, so
+   signing back in brings your schedule back. It's cleared only when a
+   different account (or a guest) starts using the phone. */
+const PERSONAL_KEYS = [
+  'scheduleItems', 'assignments', 'gradeCourses', 'priorGpa', 'priorCredits', 'savedEvents',
+  'followedOrgIds', 'interests', 'userMajor', 'userClassYear', 'theme', 'notif', 'dismissedTips',
+  // Settings that mirror the server, so signing back in doesn't push "off" over them.
+  'scheduleShare', 'nearby', 'flightAuto', 'hiddenMsgs', 'chatRead', 'sentRequests',
+];
+const pick = (obj, keys) => Object.fromEntries(keys.map((k) => [k, obj[k]]));
 
 export function AppProvider({ children }) {
   const [state, setState] = useState(DEFAULTS);
   const [hydrated, setHydrated] = useState(false);
   const [user, setUser] = useState(undefined); // undefined = loading, null = signed out
+  const [authRev, setAuthRev] = useState(0); // bumps when the same user object changes (guest → account)
+  const [mapFocus, setMapFocus] = useState(null); // { lat, lng, at } to center the Campus map
   const [profile, setProfile] = useState(null); // server profile (handle etc.)
   const [friends, setFriends] = useState([]);
   const [requests, setRequests] = useState([]);
@@ -91,6 +106,7 @@ export function AppProvider({ children }) {
             next.scheduleShare = { ...DEFAULTS.scheduleShare, ...(data.scheduleShare || {}) };
             next.nearby = { ...DEFAULTS.nearby, ...(data.nearby || {}) };
             next.avatar = { ...DEFAULT_AVATAR, ...(data.avatar || {}) };
+            next.scheduleItems = (next.scheduleItems || []).filter((i) => !isStaleOneOff(i)); // drop past one-off events
             if (!next.onboarded && data.onboardStep) next.onboardStep = data.onboardStep;
             setState(next);
           }
@@ -111,11 +127,14 @@ export function AppProvider({ children }) {
   }, [hydrated, state]);
 
   /* ---------- auth ---------- */
-  useEffect(() => onAuth((u) => setUser(u || null)), []);
+  useEffect(() => onAuth((u) => { setUser(u || null); setAuthRev((r) => r + 1); }), []);
+  // Changes when the account changes, including a guest becoming a real account.
+  const userKey = user === undefined ? 'loading' : user ? `${user.uid}:${user.isAnonymous ? 'guest' : 'acct'}` : 'none';
   useEffect(() => {
     if (!user || user.isAnonymous) { setProfile(null); return undefined; }
     return listenMyProfile(user.uid, setProfile);
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userKey]);
   useEffect(() => {
     if (!user || user.isAnonymous) { setFriends([]); setRequests([]); setFriendLocations([]); return undefined; }
     setFriendsLoaded(false);
@@ -129,10 +148,12 @@ export function AppProvider({ children }) {
     const g = listenMeetups(user.uid, setMeetups);
     const h = listenChats(user.uid, setChats);
     return () => { a(); b(); c(); d(); e(); g(); h(); };
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userKey]);
   useEffect(() => {
     if (!user || user.isAnonymous) { setBlocked([]); setFlight({}); setMeetups([]); setChats([]); }
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userKey]);
 
   const set = (patch) => setState((p) => ({ ...p, ...(typeof patch === 'function' ? patch(p) : patch) }));
 
@@ -144,15 +165,18 @@ export function AppProvider({ children }) {
 
   const addEventToSchedule = (ev, { force = false } = {}) => {
     if (!ev.time) { showToast("That event doesn't list a time, so it can't go on your schedule."); return; }
+    if (state.scheduleItems.some((i) => i.id === `ev-${ev.id}` && !isStaleOneOff(i))) { showToast("That's already on today's schedule."); return; }
     if (!force) {
-      const clash = state.scheduleItems.find((i) => (i.days || []).includes(todayCode()) && overlaps(i.time, i.endTime || i.time, ev.time, ev.endTime || ev.time));
+      const clash = state.scheduleItems.find((i) => !isStaleOneOff(i) && (i.days || []).includes(todayCode()) && overlaps(i.time, i.endTime || i.time, ev.time, ev.endTime || ev.time));
       if (clash) { setConflict({ incoming: ev, existing: clash }); return; }
     }
-    addClass({
+    const item = {
       id: `ev-${ev.id}`, time: ev.time, endTime: ev.endTime || '', title: ev.title,
       place: ev.location || buildingById(ev.buildingId)?.name || '', type: 'event', buildingId: ev.buildingId || null,
-      days: [todayCode()], oneOff: true,
-    });
+      days: [todayCode()], oneOff: true, onDate: localDay(),
+    };
+    // Drop past one-offs first, in case the app stayed open past midnight.
+    set((p) => ({ scheduleItems: sortByTime([...p.scheduleItems.filter((i) => !isStaleOneOff(i)), item]) }));
     showToast('Added to today');
   };
 
@@ -179,13 +203,26 @@ export function AppProvider({ children }) {
   const goToBuilding = (id) => { setSheet(null); setTab('campus'); setTimeout(() => setSheet({ type: 'building', id }), 50); };
 
   const notePilotUse = () => set((p) => {
-    const day = new Date().toISOString().slice(0, 10);
+    const day = localDay();
     return p.pilotDay === day ? { pilotUsedToday: p.pilotUsedToday + 1 } : { pilotDay: day, pilotUsedToday: 1 };
   });
 
-  /* Full local reset — used by Sign Out and Delete Account so the
-     flow can be re-tested honestly from the very first screen. */
-  const resetAll = () => { setState({ ...DEFAULTS }); setTab('home'); setSheet(null); };
+  /* Back to the first screen. Delete Account wipes everything. Sign Out
+     passes keepData, so the schedule, assignments and grades stay on the
+     phone, tagged with whose they are. */
+  const resetAll = ({ keepData = false, owner = null } = {}) => {
+    setState((p) => (keepData ? { ...DEFAULTS, ...pick(p, PERSONAL_KEYS), dataOwner: owner || p.dataOwner } : { ...DEFAULTS }));
+    setTab('home'); setSheet(null);
+  };
+
+  /* Call right after sign-in. Same account (or data that never had an
+     owner, like a guest's setup): keep it. Someone else's: clear it. */
+  const claimData = (newUid) => set((p) => {
+    if (p.dataOwner && p.dataOwner !== newUid) {
+      return { ...pick(DEFAULTS, PERSONAL_KEYS), pilotUsedToday: 0, pilotDay: '', dataOwner: newUid || null };
+    }
+    return { dataOwner: newUid || null };
+  });
 
   const markChatRead = (chatId, ms) => set((p) => ({ chatRead: { ...p.chatRead, [chatId]: Math.max(ms || Date.now(), p.chatRead[chatId] || 0) } }));
   const unreadChats = chats.filter((c) => c.last && c.last.from && c.last.from !== user?.uid && (c.last.atMs || 0) > (state.chatRead[c.id] || 0)).length;
@@ -198,10 +235,10 @@ export function AppProvider({ children }) {
     conflict, setConflict, toast, showToast,
     addClass, updateClass, removeClass, replaceSchedule, addEventToSchedule,
     addAssignment, updateAssignment, removeAssignment,
-    isSaved, toggleSave, toggleFollow, goToBuilding, notePilotUse, resetAll,
+    isSaved, toggleSave, toggleFollow, goToBuilding, notePilotUse, resetAll, claimData, mapFocus, setMapFocus, authRev,
     blocked, flight, meetups, chats, markChatRead, unreadChats, pendingMeetups, friendsLoaded,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [state, hydrated, user, profile, friends, friendsLoaded, requests, friendLocations, blocked, flight, meetups, chats, tab, sheet, pilotOpen, pilotSeed, conflict, toast]);
+  }), [state, hydrated, user, authRev, mapFocus, profile, friends, friendsLoaded, requests, friendLocations, blocked, flight, meetups, chats, tab, sheet, pilotOpen, pilotSeed, conflict, toast]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

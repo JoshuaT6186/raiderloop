@@ -53,7 +53,7 @@ function TheirSchedule({ uid, name }) {
 
 export function FriendSheet({ uid, onClose }) {
   const { t } = useTheme();
-  const { friends, friendLocations, sharing, set, setSheet, showToast, nearby, meetups } = useApp();
+  const { friends, friendLocations, sharing, set, setSheet, showToast, nearby, meetups, setTab, setMapFocus } = useApp();
   const f = friends.find((x) => x.uid === uid);
   if (!f) {
     return <Sheet title="Friend" onClose={onClose} height={0.4}><Empty icon="users" title="Not on your friends list" /></Sheet>;
@@ -74,7 +74,15 @@ export function FriendSheet({ uid, onClose }) {
           <Button title="Suggest a meetup" icon="users" small kind="ghost" onPress={() => setSheet({ type: 'meetupNew', to: [uid] })} />
         </View>
       </View>
-      {loc ? <PostIt color="green" seed={uid} padding={10}><PT kind="bold">Sharing location with you · {lastSeenLabel(loc.updatedAt)}</PT></PostIt> : null}
+      {loc ? (
+        <PostIt color="green" seed={uid} padding={10}>
+          <PT kind="bold">Sharing location with you · {lastSeenLabel(loc.updatedAt)}</PT>
+          {loc.lat != null ? (
+            <Button title="Show on campus map" icon="location" small kind="ghost" style={{ marginTop: 8, backgroundColor: '#fff' }}
+              onPress={() => { setMapFocus({ lat: loc.lat, lng: loc.lng, at: Date.now() }); setSheet(null); setTab('campus'); }} />
+          ) : null}
+        </PostIt>
+      ) : null}
       {theirs.length ? <T kind="small" style={{ marginTop: 8 }}>{theirs.length} upcoming {theirs.length === 1 ? 'meetup' : 'meetups'} together.</T> : null}
 
       <T kind="tiny" style={{ marginTop: 16, marginBottom: 6 }}>{name}'s schedule</T>

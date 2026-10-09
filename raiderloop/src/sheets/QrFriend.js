@@ -15,10 +15,32 @@ import { useApp } from '../state/AppContext';
 import { Camera, QRCode } from '../lib/native';
 import { api, errText } from '../lib/firebase';
 import { shareText } from '../lib/links';
+import { APP } from '../config';
 
+/* Accepts flyer://add/CODE (with or without a trailing / or ?x), an
+   invite page link ending in ?c=CODE, or a bare code. Any other QR
+   (a menu, a website) is ignored instead of being tried as a code. */
 export function parseFriendCode(s) {
-  const m = String(s || '').match(/(?:flyer:\/\/add\/)?([A-Z0-9]{6,12})\s*$/i);
+  const str = String(s || '').trim();
+  const m = str.match(/^flyer:\/\/add\/([A-Z0-9]{6,12})(?:[/?#].*)?$/i)
+    || str.match(/[?&]c=([A-Z0-9]{6,12})(?:[&#].*)?$/i)
+    || str.match(/^([A-Z0-9]{6,12})$/i);
   return m ? m[1].toUpperCase() : null;
+}
+
+/* Invite someone to Flyer. The link works whether or not they have
+   the app: the page sends them to the App Store, and once they sign up
+   the two of you are friends automatically. Lasts 7 days. */
+export async function inviteToFlyer(showToast) {
+  try {
+    const r = await api.createFriendCode({ kind: 'invite' });
+    const { code } = r.data;
+    const pageReady = !APP.inviteUrl.includes('YOUR-');
+    const msg = pageReady
+      ? `Join me on Flyer, the campus app! Tap this and we'll be friends as soon as you sign up: ${APP.inviteUrl}?c=${code}`
+      : `Join me on Flyer, the campus app! Get it here: ${APP.appStoreUrl}\nThen open Friends and type my invite code ${code} so we're friends.`;
+    shareText(`${msg}\n(Works once, for 7 days.)`);
+  } catch (e) { showToast(errText(e)); }
 }
 
 export async function redeemCode(code, showToast) {
@@ -48,12 +70,7 @@ function MyCode() {
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(id); }, []);
   useEffect(() => { if (code && !err && now > code.expiresAt) make(); }, [now, code, err, make]);
   const left = code ? Math.max(0, Math.round((code.expiresAt - now) / 1000)) : 0;
-  const invite = async () => {
-    try {
-      const r = await api.createFriendCode({ kind: 'link' });
-      shareText(`Add me on Flyer: open this on your phone → ${r.data.url}\n(or in Flyer: Friends → Add → enter ${r.data.code}). Works for 24 hours.`);
-    } catch (e) { showToast(errText(e)); }
-  };
+  const invite = () => inviteToFlyer(showToast);
   const reset = async () => {
     try { await api.resetFriendCodes({}); await make(); showToast('Old codes and links stopped working'); } catch (e) { showToast(errText(e)); }
   };
@@ -75,7 +92,7 @@ function MyCode() {
         <Button title="Send invite link" icon="share" small kind="ghost" onPress={invite} style={{ flex: 1, marginRight: 8 }} />
         <Button title="Reset my code" icon="refresh" small kind="ghost" onPress={reset} style={{ flex: 1 }} />
       </View>
-      <T kind="small" style={{ marginTop: 12 }}>Codes refresh every few minutes and invite links last 24 hours, so a screenshot posted online stops working. New friends can't see your schedule or location until you choose to share it.</T>
+      <T kind="small" style={{ marginTop: 12 }}>Codes refresh every few minutes, and invite links stop working after 7 days. You can reset both any time. New friends can't see your schedule or location until you choose to share it.</T>
       <T kind="small" color={t.pencil} style={{ marginTop: 6 }}>Their iPhone camera can scan this too. It opens Flyer and adds you.</T>
     </View>
   );
@@ -114,7 +131,7 @@ export default function QrFriendSheet({ initialTab = 'mine', onClose }) {
   const [tab, setTab] = useState(initialTab);
   if (!user || user.isAnonymous) { setTimeout(() => setSheet({ type: 'account' }), 0); return null; }
   return (
-    <Sheet title="Add a friend" hand="Scan in person. No searching." onClose={onClose} height={0.94}>
+    <Sheet title="Add a friend" hand="Scan in person, or show them yours." onClose={onClose} height={0.94}>
       <View style={{ flexDirection: 'row', borderWidth: 2, borderColor: '#1F2A44', borderRadius: 10, overflow: 'hidden', marginBottom: 14 }}>
         {[['mine', 'My code'], ['scan', 'Scan']].map(([id, label]) => (
           <Pressable key={id} onPress={() => setTab(id)} style={{ flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: tab === id ? '#1F2A44' : t.card }} accessibilityRole="tab" accessibilityState={{ selected: tab === id }}>

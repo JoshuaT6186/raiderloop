@@ -12,7 +12,7 @@ import Icon from '../../ui/Icon';
 import ClassForm from '../../sheets/ClassForm';
 import ScanSchedule from '../../sheets/ScanSchedule';
 import {
-  WEEK_DAYS, WEEK_DAY_LABELS, WEEK_DAY_FULL, itemsOnDay, todayCode, toMinutes, sortByTime, metaLine,
+  WEEK_DAYS, WEEK_DAY_LABELS, WEEK_DAY_FULL, itemsOnDay, todayCode, toMinutes, sortByTime, metaLine, isStaleOneOff,
 } from '../../lib/time';
 import { useNow } from '../../lib/hooks';
 import { exportToCalendar } from '../../lib/calendarExport';
@@ -30,7 +30,7 @@ export default function Classes() {
   const [day, setDay] = useState(todayCode(now));
   const [form, setForm] = useState(null);
   const [exporting, setExporting] = useState(false);
-  const classes = scheduleItems.filter((c) => !c.oneOff || (c.days || []).includes(todayCode(now)));
+  const classes = scheduleItems.filter((c) => !c.oneOff || !isStaleOneOff(c));
   const max = Math.max(1, ...WEEK_DAYS.map((d) => hoursOn(classes, d)));
   const list = sortByTime(itemsOnDay(classes, day));
   const nowM = now.getHours() * 60 + now.getMinutes();

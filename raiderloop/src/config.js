@@ -12,8 +12,10 @@ export const APP = {
   name: 'Flyer',
   tagline: 'Your campus, folded into one app.',
   supportEmail: 'eternityworks2026@gmail.com',
-  privacyUrl: 'https://YOUR-GITHUB-USERNAME.github.io/flyer/privacy.html', // TODO: host docs/privacy.html
-  termsUrl: 'https://YOUR-GITHUB-USERNAME.github.io/flyer/terms.html', // TODO: host docs/terms.html
+  privacyUrl: 'https://eternityworks.dev/flyer/privacy.html',
+  termsUrl: 'https://eternityworks.dev/flyer/terms.html',
+  inviteUrl: 'https://eternityworks.dev/flyer/invite.html',
+  appStoreUrl: 'https://apps.apple.com/app/id6819983191',
   disclaimer:
     'Flyer is an independent, student-built app. It is not affiliated with, endorsed by, or sponsored by any university. School names are used only to describe which campus the information is about.',
   storageKey: 'flyer_v1',
@@ -82,9 +84,9 @@ export const ADS = {
 
 /* Flyer Plus via RevenueCat. Public SDK keys only. */
 export const PURCHASES = {
-  iosKey: '', // appl_xxxxxxxxx from RevenueCat
+  iosKey: 'appl_eUufOXAEVAfkREBtmSTYLhQPSdp', // RevenueCat public SDK key (safe to ship)
   androidKey: '', // goog_xxxxxxxxx
-  entitlement: 'plus',
+  entitlement: 'flyer_plus', // must match the RevenueCat entitlement identifier exactly
   priceHint: '$4.99/mo', // display only; real price comes from the store
 };
 

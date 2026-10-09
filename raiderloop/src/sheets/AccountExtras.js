@@ -13,6 +13,9 @@ import {
 import { AppleAuth, Crypto } from '../lib/native';
 import { unregisterPush } from '../lib/push';
 import { stopNearby } from '../lib/nearby';
+import { clearScheduled } from '../lib/notifications';
+import { clearWidget } from '../lib/widget';
+import { logOutPurchases } from '../lib/monetize';
 
 /* ---------- Delete account ---------- */
 const DELETES = [
@@ -59,6 +62,7 @@ export function DeleteAccountSheet({ onClose }) {
       await unregisterPush().catch(() => {});
       await deleteMyAccount();
       await stopNearby().catch(() => {});
+      await logOutPurchases(); await clearScheduled(); clearWidget();
       await signOut().catch(() => {});
       resetAll();
       showToast('Your account was deleted');

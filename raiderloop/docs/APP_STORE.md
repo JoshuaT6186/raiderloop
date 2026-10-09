@@ -1,6 +1,6 @@
 # App Store listing — Flyer
 
-**Name:** Flyer — Campus Planner
+**Name:** Flyer: Campus Planner
 **Subtitle (30 chars):** Classes, campus & friends
 **Category:** Education (secondary: Lifestyle)
 **Age rating:** answer the questionnaire honestly. Flyer now has user-to-user messaging and photo sharing (friends only, filtered, reportable) and location sharing, so expect **17+** unless Apple's questionnaire says otherwise. "Unrestricted web access" = No.
@@ -26,7 +26,7 @@ KNOW YOUR CAMPUS
 FIND YOUR PEOPLE
 • 500+ student organizations, including Greek life
 • Live events and campus headlines
-• Add friends by scanning their QR code, and draw your own doodle avatar
+• Find friends by name or @username (with a check that it's really them), scan their QR code, or invite them to Flyer, and draw your own doodle avatar
 • Message friends, or start a flock (a small group chat) with up to 15 friends
 • Send meetup cards: pick a public campus spot and a time, and Flyer checks you in when you're both there
 • Share your schedule (just free/busy, or full) with the friends you choose, and find a time everyone's free
@@ -44,7 +44,7 @@ ASK PILOT
 Flyer is an independent, student-built app and is not affiliated with, endorsed by, or sponsored by any university.
 
 Flyer Plus (optional monthly subscription, $4.99/month): no ads, more Pilot questions a day, and extra avatar gear. Payment is charged to your Apple ID at confirmation and renews automatically unless canceled at least 24 hours before the end of the current period. Manage or cancel it in your App Store account settings.
-Terms: [your terms URL] · Privacy: [your privacy URL]
+Terms: https://eternityworks.dev/flyer/terms.html · Privacy: https://eternityworks.dev/flyer/privacy.html
 
 **Keywords (100 chars):** college,campus,class schedule,planner,gpa,assignments,student,dining,friends,map,finals,university
 
@@ -64,7 +64,7 @@ Terms: [your terms URL] · Privacy: [your privacy URL]
 ## Review notes (paste into App Review Information)
 > Flyer is an independent, student-built campus app; it doesn't use any university login. To review without making an account, tap "Let's fly" → "Look around first". Social features need an account: [create TWO demo accounts that are friends with each other, and put both emails and passwords here, so the reviewer can see chat, flocks, and meetups].
 >
-> **User-generated content (Guideline 1.2):** messages and photos are only between accepted friends (or a flock made of friends). Text is filtered for objectionable words; photos are checked by an automated safety filter before anyone can see them. Every message has Report, Hide, and Block (press and hold a message). Every person has Report and Block (their profile, class lists, and chat info). Reported content is reviewed within 24 hours; a message reported by two people is hidden immediately. Terms of use state zero tolerance for objectionable content. Messages auto-delete after 30 days.
+> **User-generated content (Guideline 1.2):** messages and photos are only between accepted friends (or a flock made of friends). Text is filtered for objectionable words; photos are checked by an automated safety filter before anyone can see them. Every message has Report, Hide, and Block (press and hold a message). Every person has Report and Block (their profile and chat info). Reported content is reviewed within 24 hours; a message reported by two people is hidden immediately. Terms of use state zero tolerance for objectionable content. Messages auto-delete after 30 days.
 >
 > **Background location (Guideline 5.1.1/2.5.4):** used by two opt-in features, both off by default. (1) Automatic check-ins for flight score, turned on in You → Flight passport: the phone compares its location with a list of campus places on the device, and only after the user has stayed at one for about 5 minutes does it send that place and one reading to confirm the visit. Coordinates and routes are not stored. Flight score is cosmetic and only works with this on. (2) Nearby alerts, turned on in Friends → Sharing: tells two friends who BOTH opted in that they're close by on campus. No one is shown anyone's location. Optional live sharing runs only while the app is open.
 >

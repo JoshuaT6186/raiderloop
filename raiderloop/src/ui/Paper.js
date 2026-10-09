@@ -298,10 +298,13 @@ export function Sheet({ visible = true, onClose, title, hand, children, height =
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(20,24,36,0.42)' }} onPress={onClose} accessibilityLabel="Close" />
-        <Animated.View style={{ maxHeight: SCREEN_H * height, transform: [{ translateY: y }] }}>
+        {/* The gap at the top keeps the sheet clear of the clock and
+            Dynamic Island. Everything below can shrink, so when the
+            keyboard opens the sheet fits above it instead of sliding under. */}
+        <Pressable style={{ flex: 1, minHeight: Platform.OS === 'ios' ? 56 : 24, backgroundColor: 'rgba(20,24,36,0.42)' }} onPress={onClose} accessibilityLabel="Close" />
+        <Animated.View style={{ maxHeight: SCREEN_H * height, flexShrink: 1, transform: [{ translateY: y }] }}>
           <TornEdge color={t.paper} />
-          <View style={{ backgroundColor: t.paper, paddingBottom: 30 }}>
+          <View style={{ backgroundColor: t.paper, paddingBottom: 30, flexShrink: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: PAD, paddingTop: 6 }}>
               <View style={{ flex: 1 }}>
                 {title ? <T kind="handBig">{title}</T> : null}
@@ -311,12 +314,12 @@ export function Sheet({ visible = true, onClose, title, hand, children, height =
               <IconButton name="close" onPress={onClose} size={18} label="Close" style={{ width: 36, height: 36, marginLeft: 8 }} />
             </View>
             <Body
-              style={scroll ? { maxHeight: SCREEN_H * height - 120 } : null}
+              style={scroll ? { maxHeight: SCREEN_H * height - 120, flexShrink: 1 } : { flexShrink: 1 }}
               contentContainerStyle={scroll ? { paddingHorizontal: PAD, paddingTop: 10, paddingBottom: 16 } : null}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
-              {scroll ? children : <View style={{ paddingHorizontal: PAD, paddingTop: 10 }}>{children}</View>}
+              {scroll ? children : <View style={{ paddingHorizontal: PAD, paddingTop: 10, flexShrink: 1 }}>{children}</View>}
             </Body>
             {footer ? <View style={{ paddingHorizontal: PAD, paddingTop: 8 }}>{footer}</View> : null}
           </View>

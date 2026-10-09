@@ -55,7 +55,7 @@ export async function fetchWeather(schoolId = 'ttu') {
   const c = (SCHOOLS.find((s) => s.id === schoolId) || SCHOOLS[0]).center;
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${c.latitude}&longitude=${c.longitude}`
     + '&current=temperature_2m,weather_code,is_day&hourly=temperature_2m,precipitation_probability,weather_code'
-    + '&daily=temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&timezone=America%2FChicago&forecast_days=2';
+    + '&daily=temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&timezone=America%2FChicago&forecast_days=7';
   const r = await fetch(url);
   const data = await r.json();
   if (!data || !data.current) throw new Error('no weather');
@@ -84,8 +84,9 @@ export function useWeather(schoolId) {
 }
 
 /** Forecast at a given Date from hourly data (nearest hour). */
-export function forecastAt(hourly, date) {
+export function forecastAt(hourly, at) {
   if (!hourly || !hourly.length) return null;
+  const date = new Date(at.getTime() + 30 * 60000); // round to the nearest hour (9:50 → 10:00)
   const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}T${String(date.getHours()).padStart(2, '0')}:00`;
   return hourly.find((h) => h.time === key) || null;
 }

@@ -11,7 +11,8 @@ import { useApp } from '../state/AppContext';
 import { FOOTBALL_SCHEDULE, gameDateLabel, buildingById, RESOURCES } from '../data/campus';
 import { openUrl, openDirections } from '../lib/links';
 import { expiryFor, getForegroundPermission, sharingActive } from '../lib/location';
-import { emailSignUp, appleSignIn } from '../lib/firebase';
+import { emailSignUp, appleSignIn, getMyProfile, nameProblem } from '../lib/firebase';
+import { DEFAULT_AVATAR } from '../ui/avatarParts';
 import { AppleAuth, Crypto } from '../lib/native';
 import { getPlusOffering, buyPlus, restorePlus, purchasesAvailable } from '../lib/monetize';
 import { APP, LIMITS, PURCHASES } from '../config';
@@ -91,7 +92,7 @@ export function PlusSheet({ onClose }) {
     <Sheet title="Flyer Plus" hand="Everything stays free. Plus is a thank-you with perks." onClose={onClose}
       footer={(
         <View>
-          {!purchasesAvailable() ? <T kind="small" style={{ marginBottom: 8 }}>Purchases aren't available right now. Check your connection and reopen this screen.</T> : null}
+          {!purchasesAvailable() ? <T kind="small" style={{ marginBottom: 8 }}>Flyer Plus isn't available yet. Check back soon.</T> : null}
           {hasAccount ? (
             <Button title={pkg ? `Get Plus · ${price}` : 'Get Plus'} icon="crown" kind="highlight" loading={busy || (purchasesAvailable() && offering === undefined)} disabled={!pkg} onPress={buy} />
           ) : (
@@ -128,7 +129,7 @@ export function PlusSheet({ onClose }) {
 /* ---------- Guest → account ---------- */
 export function AccountSheet({ onClose }) {
   const { t } = useTheme();
-  const { userName, set, showToast } = useApp();
+  const { userName, set, showToast, claimData } = useApp();
   const [name, setName] = useState(userName);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -136,13 +137,23 @@ export function AccountSheet({ onClose }) {
   const [error, setError] = useState(null);
   const create = async () => {
     setBusy(true); setError(null);
-    try { await emailSignUp(email.trim(), password, name.trim()); set({ userName: name.trim() }); showToast('Account created'); onClose(); } catch (e) { setError(e.message); }
+    const problem = await nameProblem(name);
+    if (problem) { setError(problem); setBusy(false); return; }
+    try { const nu = await emailSignUp(email.trim(), password, name.trim()); claimData(nu?.uid); set({ userName: name.trim() }); showToast('Account created'); onClose(); } catch (e) { setError(e.message); }
     setBusy(false);
   };
   return (
     <Sheet title="Make your account" hand="Everything you've set up comes with you." onClose={onClose}
       footer={<Button title="Create account" icon="check" loading={busy} disabled={!email || password.length < 6 || !name.trim()} onPress={create} />}>
-      {AppleAuth ? <Button title="Continue with Apple" icon="lock" kind="ghost" onPress={async () => { try { await appleSignIn(AppleAuth, Crypto); showToast('Signed in'); onClose(); } catch (e) { if (!/cancel/i.test(e.code || '')) setError(e.message); } }} style={{ marginBottom: 14 }} /> : null}
+      {AppleAuth ? <Button title="Continue with Apple" icon="lock" kind="ghost" onPress={async () => { try {
+        const r = await appleSignIn(AppleAuth, Crypto);
+        claimData(r.user?.uid);
+        // Signed in to an existing account: load its profile so this phone's
+        // guest name and avatar don't overwrite it.
+        const prof = r.switched ? await getMyProfile(r.user.uid) : null;
+        if (prof && prof.name) set({ userName: prof.name, avatar: { ...DEFAULT_AVATAR, ...(prof.avatar || {}) }, schoolId: prof.schoolId || 'ttu' });
+        showToast('Signed in'); onClose();
+      } catch (e) { if (!/cancel/i.test(e.code || '')) setError(e.message); } }} style={{ marginBottom: 14 }} /> : null}
       <Field label="First name" value={name} onChangeText={setName} autoCapitalize="words" />
       <Field label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
       <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry placeholder="6+ characters" />

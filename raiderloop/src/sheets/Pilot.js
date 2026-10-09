@@ -22,7 +22,7 @@ import { api } from '../lib/firebase';
 import { useWeather } from '../lib/hooks';
 import { isOpenNow } from '../lib/hours';
 import {
-  itemsOnDay, todayCode, toMinutes, sortByTime, dueLabel, metaLine,
+  itemsOnDay, todayCode, toMinutes, sortByTime, dueLabel, metaLine, localDay,
 } from '../lib/time';
 import {
   BUILDINGS, ORGS, DINING, RESOURCES, buildingById, catLabel, walkLabel, nextGame, gameDateLabel,
@@ -68,20 +68,28 @@ function buildContext({ scheduleItems, assignments, weather, userMajor, userClas
 export default function Pilot({ onClose }) {
   const { t } = useTheme();
   const app = useApp();
-  const { scheduleItems, assignments, savedEvents, goToBuilding, setSheet, setTab, pilotSeed, setPilotSeed, notePilotUse, isPlus, pilotUsedToday, pilotDay, schoolId } = app;
+  const { scheduleItems, assignments, savedEvents, goToBuilding, setSheet, setTab, pilotSeed, setPilotSeed, notePilotUse, isPlus, pilotUsedToday, pilotDay, schoolId, user, set } = app;
   const weather = useWeather(schoolId);
+  /* The server's count is the real one (it follows the account across
+     phones), so sync the "left today" number to it when Pilot opens. */
+  useEffect(() => {
+    if (!user) return;
+    api.getUsage({}).then((r) => { if (r?.data && typeof r.data.pilot === 'number') set({ pilotDay: localDay(), pilotUsedToday: r.data.pilot }); }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [input, setInput] = useState('');
   const [thread, setThread] = useState([]);
   const [photo, setPhoto] = useState(null);
   const scroller = useRef(null);
-  const usedToday = pilotDay === new Date().toISOString().slice(0, 10) ? pilotUsedToday : 0;
+  const usedToday = pilotDay === localDay() ? pilotUsedToday : 0;
   const limit = isPlus ? LIMITS.pilotPlus : LIMITS.pilotFree;
 
   const local = (low) => {
     if (/(next|my) class|where.*class|what.*class|schedule today/.test(low)) {
       const nowM = new Date().getHours() * 60 + new Date().getMinutes();
-      const next = sortByTime(itemsOnDay(scheduleItems, todayCode())).find((i) => (toMinutes(i.endTime) ?? 0) > nowM);
-      if (!next) return { text: scheduleItems.length ? "You're done with classes for today." : "You haven't added any classes yet. Add them in the Planner and I'll know." };
+      const todays = sortByTime(itemsOnDay(scheduleItems, todayCode()));
+      const next = todays.find((i) => (toMinutes(i.endTime) ?? toMinutes(i.time) ?? 0) > nowM);
+      if (!next) return { text: todays.length || scheduleItems.some((i) => !i.oneOff) ? "You're done with classes for today." : "You haven't added any classes yet. Add them in the Planner and I'll know." };
       const b = buildingById(next.buildingId);
       return { text: `${next.title} at ${next.time} in ${next.place || b?.name}.${b?.walk ? ` About a ${b.walk}-minute walk.` : ''}`, buildingId: next.buildingId };
     }
@@ -200,7 +208,7 @@ export default function Pilot({ onClose }) {
           <T kind="small" style={{ fontSize: 11, marginTop: 6, textAlign: 'center' }}>{Math.max(0, limit - usedToday)} live answers left today · Homework help walks you through it step by step · Pilot can be wrong.</T>
         </View>
       )}>
-      <ScrollView ref={scroller} style={{ height: 420 }} contentContainerStyle={{ paddingBottom: 10 }} keyboardShouldPersistTaps="handled">
+      <ScrollView ref={scroller} style={{ height: 420, flexShrink: 1 }} onLayout={() => scroller.current?.scrollToEnd({ animated: false })} contentContainerStyle={{ paddingBottom: 10 }} keyboardShouldPersistTaps="handled">
         {!thread.length ? (
           <View>
             <T kind="hand" style={{ marginBottom: 8 }}>try one of these:</T>

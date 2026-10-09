@@ -2,7 +2,7 @@
  * Friends: list, requests, and location sharing.
  * See lib/location.js for the safety rules sharing follows.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Pressable } from 'react-native';
 import { Sheet, T, PostIt, PT, Card, Button, Row, Chip, Field, Toggle, Empty, Divider } from '../ui/Paper';
 import Icon from '../ui/Icon';
@@ -10,7 +10,7 @@ import Avatar from '../ui/Avatar';
 import { useTheme } from '../theme/ThemeContext';
 import { useApp } from '../state/AppContext';
 import { api, errText } from '../lib/firebase';
-import { parseFriendCode, redeemCode } from './QrFriend';
+import { parseFriendCode, redeemCode, inviteToFlyer } from './QrFriend';
 import { ShareLevelPicker } from './FriendProfile';
 import { startNearby, nearbyAvailable } from '../lib/nearby';
 import { shareText } from '../lib/links';
@@ -33,20 +33,98 @@ function NeedsAccount() {
   );
 }
 
+const CODE_RE = /^[A-HJ-NP-Z2-9]{8}$/i;
+const STATUS_LABEL = { friend: 'Friends', requested: 'Requested', incoming: 'Wants to add you' };
+
+/* Search by first name or @username. Tapping a result opens a confirm
+   card (big avatar, name, username, mutual friends) so you can check
+   it's really them before anything is sent. */
+function FindPeople() {
+  const { t } = useTheme();
+  const { showToast } = useApp();
+  const [q, setQ] = useState('');
+  const [results, setResults] = useState(null); // null = not searched yet
+  const [resultsFor, setResultsFor] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [picked, setPicked] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const raw = q.trim();
+  const typedCode = !raw.startsWith('@') && CODE_RE.test(raw.replace(/[-\s]/g, '')) ? parseFriendCode(raw.replace(/[-\s]/g, '')) : null;
+  // An 8-letter name like "maryanne" also fits the code pattern, so only
+  // offer it as a code if it has a digit or nobody by that name turned up.
+  const code = typedCode && (/\d/.test(typedCode) || (results && !results.length && resultsFor === raw)) ? typedCode : null;
+
+  useEffect(() => {
+    setPicked(null);
+    if (raw.replace(/^@/, '').length < 3) { setResults(null); setSearching(false); return undefined; }
+    let live = true;
+    const id = setTimeout(async () => {
+      setSearching(true);
+      try { const r = await api.searchPeople({ q: raw }); if (live) { setResults(r.data.results || []); setResultsFor(raw); } } catch (e) { if (live) { setResults([]); setResultsFor(raw); showToast(errText(e, "Couldn't search right now")); } }
+      if (live) setSearching(false);
+    }, 450);
+    return () => { live = false; clearTimeout(id); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [raw]);
+
+  const redeemTyped = async () => {
+    setBusy(true);
+    if (await redeemCode(code, showToast)) setQ('');
+    setBusy(false);
+  };
+  const send = async (p) => {
+    setBusy(true);
+    try {
+      const r = await api.sendFriendRequest({ uid: p.uid });
+      showToast(r.data?.accepted ? `You and ${(p.name || 'them').split(' ')[0]} are friends!` : 'Request sent');
+      setResults((list) => (list || []).map((x) => (x.uid === p.uid ? { ...x, status: r.data?.accepted ? 'friend' : 'requested' } : x)));
+      setPicked(null);
+    } catch (e) { showToast(errText(e, "Couldn't send that request")); }
+    setBusy(false);
+  };
+  const mutualText = (n) => (n ? `${n} mutual ${n === 1 ? 'friend' : 'friends'}` : 'No mutual friends yet');
+
+  return (
+    <View>
+      <Field placeholder="Search a name or @username" value={q} onChangeText={setQ} autoCapitalize="none" autoCorrect={false} returnKeyType="search" style={{ marginBottom: 8 }} />
+      {code ? <Row title={`Use invite code ${code}`} meta="Adds you as friends right away" left={<Icon name="qr" color={t.ink} />} onPress={busy ? undefined : redeemTyped} last /> : null}
+
+      {picked ? (
+        <PostIt color="yellow" tilt={-0.6} tape padding={18} style={{ marginVertical: 8 }}>
+          <View style={{ alignItems: 'center' }}>
+            <Avatar config={picked.avatar} size={84} />
+            <PT kind="title" style={{ marginTop: 8 }}>{picked.name || `@${picked.handle}`}</PT>
+            <PT kind="bold">@{picked.handle}</PT>
+            <PT kind="small" style={{ marginTop: 2 }}>{mutualText(picked.mutual)}</PT>
+          </View>
+          <PT kind="small" style={{ marginTop: 10, textAlign: 'center' }}>Is this them? If you're not sure, ask for their username or scan their QR code.</PT>
+          {picked.status === 'none' || picked.status === 'incoming' ? (
+            <View style={{ flexDirection: 'row', marginTop: 12 }}>
+              <Button title="Not them" kind="ghost" small onPress={() => setPicked(null)} style={{ flex: 1, marginRight: 8, backgroundColor: '#fff' }} />
+              <Button title={picked.status === 'incoming' ? 'Accept' : 'Send request'} icon="userPlus" small loading={busy} onPress={() => send(picked)} style={{ flex: 1 }} />
+            </View>
+          ) : (
+            <Button title={picked.status === 'friend' ? "You're already friends" : 'Request already sent'} kind="ghost" small onPress={() => setPicked(null)} style={{ marginTop: 12, backgroundColor: '#fff' }} />
+          )}
+        </PostIt>
+      ) : null}
+
+      {!picked && searching && !results ? <T kind="small" color={t.pencil}>Searching…</T> : null}
+      {!picked && results && results.length ? results.map((p, i) => (
+        <Row key={p.uid} title={p.name || `@${p.handle}`} meta={`@${p.handle} · ${mutualText(p.mutual)}`}
+          left={<Avatar config={p.avatar} size={42} />} last={i === results.length - 1} onPress={() => setPicked(p)}
+          right={STATUS_LABEL[p.status] ? <T kind="small" color={t.pencil}>{STATUS_LABEL[p.status]}</T> : null} />
+      )) : null}
+      {!picked && results && !results.length && !searching && !code ? (
+        <T kind="small" style={{ marginVertical: 6 }}>No one found for "{resultsFor}". Check the spelling, or invite them to Flyer below.</T>
+      ) : null}
+    </View>
+  );
+}
+
 function FriendsTab() {
   const { t } = useTheme();
   const { friends, profile, friendLocations, showToast, setSheet, unreadChats } = useApp();
-  const [code, setCode] = useState('');
-  const [busy, setBusy] = useState(false);
-  const add = async () => {
-    const raw = code.trim();
-    setBusy(true);
-    // Invite codes are 8 characters from A–Z (no I or O) and 2–9.
-    const token = !raw.startsWith('@') && /^[A-HJ-NP-Z2-9]{8}$/i.test(raw.replace(/[-\s]/g, '')) ? parseFriendCode(raw.replace(/[-\s]/g, '')) : null;
-    if (token && (await redeemCode(token, () => {}))) { showToast('Added!'); setCode(''); setBusy(false); return; }
-    try { await api.sendFriendRequest({ handle: raw.replace(/^@/, '') }); showToast('Request sent'); setCode(''); } catch (e) { showToast(errText(e, "Couldn't send that request")); }
-    setBusy(false);
-  };
   return (
     <View>
       <View style={{ flexDirection: 'row', marginBottom: 14 }}>
@@ -54,9 +132,12 @@ function FriendsTab() {
         <Button title="Scan a code" icon="scan" small kind="ghost" onPress={() => setSheet({ type: 'qr', tab: 'scan' })} style={{ flex: 1 }} />
       </View>
       <Row title="Messages" meta={unreadChats ? `${unreadChats} unread` : 'Friends and flocks'} left={<Icon name="chat" color={t.ink} />} onPress={() => setSheet({ type: 'chats' })} />
+      <T kind="tiny" style={{ marginTop: 16, marginBottom: 6 }}>Add a friend</T>
+      <FindPeople />
+      <Row title="Invite someone to Flyer" meta="Not on Flyer yet? Send a link. You'll be friends once they sign up." left={<Icon name="share" color={t.ink} />} onPress={() => inviteToFlyer(showToast)} last />
       {profile?.handle ? (
         <Card style={{ marginVertical: 14 }}>
-          <T kind="tiny">Your username. Friends type it to send a request</T>
+          <T kind="tiny">Your username. Friends can search for it</T>
           <T kind="title" style={{ marginTop: 4 }} selectable>@{profile.handle}</T>
           <View style={{ flexDirection: 'row', marginTop: 10 }}>
             <Button title="Change" icon="pencil" small kind="ghost" onPress={() => setSheet({ type: 'handle', back: { type: 'friends' } })} style={{ flex: 1, marginRight: 8 }} />
@@ -64,17 +145,14 @@ function FriendsTab() {
           </View>
         </Card>
       ) : null}
-      <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-        <Field placeholder="@username or invite code" value={code} onChangeText={setCode} autoCapitalize="none" style={{ flex: 1, marginRight: 8 }} />
-        <Button title="Add" small loading={busy} disabled={code.trim().length < 3} onPress={add} style={{ marginTop: 2 }} />
-      </View>
+      <T kind="tiny" style={{ marginTop: 6, marginBottom: 6 }}>Your friends</T>
       {friends.length ? friends.map((f, i) => {
         const loc = friendLocations.find((l) => l.uid === f.uid);
         return (
           <Row key={f.uid} title={f.name || f.handle} meta={loc ? `Sharing location with you · ${lastSeenLabel(loc.updatedAt)}` : `@${f.handle}`}
             left={<Avatar config={f.avatar} size={42} />} last={i === friends.length - 1} onPress={() => setSheet({ type: 'friend', uid: f.uid })} />
         );
-      }) : <Empty icon="users" title="No friends yet" body="Show your QR code, or add someone with theirs." />}
+      }) : <Empty icon="users" title="No friends yet" body="Search for someone above, show your QR code, or invite them to Flyer." />}
     </View>
   );
 }

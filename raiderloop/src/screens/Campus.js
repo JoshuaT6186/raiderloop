@@ -82,7 +82,7 @@ function SelectedCard({ b, onClose }) {
 
 export default function Campus() {
   const { t } = useTheme();
-  const { setSheet, sheet, schoolId, friendLocations = [] } = useApp();
+  const { setSheet, sheet, schoolId, friendLocations = [], mapFocus } = useApp();
   const [cat, setCat] = useState('All');
   const [q, setQ] = useState('');
   const [pos, setPos] = useState(null);
@@ -94,6 +94,15 @@ export default function Campus() {
 
   useEffect(() => { currentPosition().then(setPos).catch(() => {}); }, []);
   useEffect(() => { Animated.spring(h, { toValue: expanded ? EXPANDED : COLLAPSED, useNativeDriver: false, friction: 9 }).start(); }, [expanded]);
+
+  /* "Show on map" from a friend's profile. */
+  const focusFresh = mapFocus && Date.now() - mapFocus.at < 10000;
+  useEffect(() => {
+    if (!focusFresh) return undefined;
+    const id = setTimeout(() => mapRef.current?.animateToRegion({ latitude: mapFocus.lat, longitude: mapFocus.lng, latitudeDelta: 0.006, longitudeDelta: 0.006 }, 500), 350);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapFocus]);
 
   /* When a building sheet opens from elsewhere, center the map on it. */
   useEffect(() => {
@@ -112,6 +121,13 @@ export default function Campus() {
 
   const MapView = Maps?.default; const Marker = Maps?.Marker;
   const visibleFriends = friendLocations.filter((f) => f.lat != null);
+  /* Zoom to fit everyone sharing with you (and you). */
+  const showFriends = () => {
+    const pts = visibleFriends.map((f) => ({ latitude: f.lat, longitude: f.lng }));
+    if (pos) pts.push({ latitude: pos.lat, longitude: pos.lng });
+    if (pts.length === 1) mapRef.current?.animateToRegion({ ...pts[0], latitudeDelta: 0.006, longitudeDelta: 0.006 }, 500);
+    else if (pts.length) mapRef.current?.fitToCoordinates(pts, { edgePadding: { top: 200, right: 60, bottom: 260, left: 60 }, animated: true });
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: t.paper }}>
@@ -154,7 +170,11 @@ export default function Campus() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
             {['All', 'Open now', ...CAMPUS_CATS.filter((c) => c !== 'All')].map((c) => <Chip key={c} label={catLabel(c)} active={cat === c} onPress={() => setCat(c)} />)}
           </ScrollView>
-          {visibleFriends.length ? <T kind="hand" style={{ marginTop: 2 }}>{visibleFriends.length} {visibleFriends.length === 1 ? 'friend' : 'friends'} sharing with you</T> : null}
+          {visibleFriends.length ? (
+            <View style={{ flexDirection: 'row', marginTop: 4 }}>
+              <Chip icon="users" label={`${visibleFriends.length} ${visibleFriends.length === 1 ? 'friend' : 'friends'} sharing · show`} onPress={showFriends} />
+            </View>
+          ) : null}
           {selected ? <SelectedCard b={selected} onClose={() => setSelected(null)} /> : null}
         </View>
       </SafeAreaView>

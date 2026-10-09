@@ -14,7 +14,7 @@ import { getForegroundPermission } from '../../lib/location';
 import { initAds } from '../../lib/monetize';
 import { Notifications, Location, Tracking } from '../../lib/native';
 
-function Perm({ icon, title, body, state, onAsk, color }) {
+function Perm({ icon, title, body, state, onAsk, color, askLabel = 'Allow' }) {
   const { t } = useTheme();
   return (
     <Card style={{ marginBottom: 12 }}>
@@ -28,7 +28,7 @@ function Perm({ icon, title, body, state, onAsk, color }) {
           <View style={{ marginTop: 10, flexDirection: 'row' }}>
             {state === 'granted' ? <Stamp label="On" color={t.ok} />
               : state === 'denied' ? <Stamp label="Off in Settings" color={t.pencil} />
-                : <Button title="Allow" small onPress={onAsk} />}
+                : <Button title={askLabel} small onPress={onAsk} />}
           </View>
         </View>
       </View>
@@ -56,9 +56,14 @@ export default function Permissions({ returning = false }) {
         body="Sorts what's open by real walking distance. Friends can only ever see you if you turn on sharing and pick them. That's separate."
         onAsk={async () => setLoc((await getForegroundPermission(true)) ? 'granted' : 'denied')} />
       {ads ? (
-        <Perm icon="tag" color="pink" title="Ads that keep Flyer free" state={ads}
+        <Perm icon="tag" color="pink" title="Ads that keep Flyer free" state={ads} askLabel="Continue"
           body="iOS will ask if apps can track you across other apps. Saying no is totally fine. You'll still see ads, just less relevant ones. Your schedule, location, and friends are never shared with advertisers."
-          onAsk={async () => { await initAds({ askTracking: true }); setAds('granted'); }} />
+          onAsk={async () => {
+            // Ask Apple's tracking question directly, then start ads either way.
+            const st = await Tracking.requestTrackingPermissionsAsync().catch(() => null);
+            await initAds({ askTracking: false });
+            setAds(st?.status === 'granted' ? 'granted' : st?.status === 'denied' ? 'denied' : 'ask');
+          }} />
       ) : null}
     </Shell>
   );

@@ -1,7 +1,7 @@
 /**
  * Local notifications — no server involved.
  * ------------------------------------------------------------
- * Schedules, for the next 7 days:
+ * Schedules, for the next 14 days (and again every time Flyer opens):
  *   • class reminders N minutes before each class, with a weather
  *     heads-up when the forecast at class time calls for one
  *   • assignment reminders N hours before each due date
@@ -12,9 +12,10 @@
  * pending local notifications at 64, so the list is trimmed to the
  * soonest 60.
  */
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 import { Notifications } from './native';
-import { toMinutes, todayCode, DAY_TO_JS } from './time';
+import { toMinutes, DAY_TO_JS, isStaleOneOff } from './time';
 import { fetchWeather, forecastAt, weatherNote } from './hooks';
 
 export async function ensureNotificationPermission(ask = true) {
@@ -26,7 +27,7 @@ export async function ensureNotificationPermission(ask = true) {
   return !!req.granted;
 }
 
-function nextOccurrences(item, days = 7) {
+function nextOccurrences(item, days = 14) {
   const out = [];
   const mins = toMinutes(item.time);
   if (mins == null) return out;
@@ -36,18 +37,28 @@ function nextOccurrences(item, days = 7) {
     const code = ['Su', 'M', 'T', 'W', 'Th', 'F', 'Sa'][d.getDay()];
     if (item.oneOff && i > 0) break;
     if (item.days && !item.days.includes(code)) continue;
-    if (item.oneOff && !(item.days || []).includes(todayCode())) continue;
+    if (item.oneOff && isStaleOneOff(item)) continue;
     const at = new Date(d); at.setMinutes(mins);
     out.push(at);
   }
   return out;
 }
 
+/* Only the newest refill may write. Each run checks its number after
+   every wait, so two overlapping runs can't both schedule a full set. */
+let generation = 0;
+
+/* Sign-out / delete: nothing of the last person's should still fire. */
+export async function clearScheduled() {
+  generation += 1;
+  if (Notifications) await Notifications.cancelAllScheduledNotificationsAsync().catch(() => {});
+}
+
 export async function rescheduleAll({ scheduleItems, assignments, savedEvents, notif, schoolId }) {
   if (!Notifications) return;
+  const gen = ++generation;
   const ok = await ensureNotificationPermission(false);
-  if (!ok) return;
-  await Notifications.cancelAllScheduledNotificationsAsync();
+  if (!ok || gen !== generation) return;
   const now = Date.now();
   const queue = [];
 
@@ -89,7 +100,10 @@ export async function rescheduleAll({ scheduleItems, assignments, savedEvents, n
   }
 
   queue.sort((a, b) => a.at - b.at);
+  if (gen !== generation) return; // a newer refill took over
+  await Notifications.cancelAllScheduledNotificationsAsync();
   for (const n of queue.slice(0, 60)) {
+    if (gen !== generation) return;
     await Notifications.scheduleNotificationAsync({
       content: { title: n.title, body: n.body },
       trigger: { type: 'date', date: n.at },
@@ -99,12 +113,22 @@ export async function rescheduleAll({ scheduleItems, assignments, savedEvents, n
 
 export function useNotificationScheduler(app) {
   const { hydrated, onboarded, scheduleItems, assignments, savedEvents, notif, schoolId } = app;
+  /* Refill the queue each time Flyer comes back to the foreground, so
+     reminders (and their weather notes) stay current. */
+  const [wake, setWake] = useState(0);
+  useEffect(() => {
+    let last = Date.now();
+    const sub = AppState.addEventListener('change', (st) => {
+      if (st === 'active' && Date.now() - last > 30 * 60000) { last = Date.now(); setWake((w) => w + 1); }
+    });
+    return () => sub.remove();
+  }, []);
   useEffect(() => {
     if (!hydrated || !onboarded) return;
     const id = setTimeout(() => { rescheduleAll({ scheduleItems, assignments, savedEvents, notif, schoolId }).catch(() => {}); }, 800);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated, onboarded, JSON.stringify(scheduleItems), JSON.stringify(assignments), JSON.stringify(savedEvents.map((e) => e.id)), JSON.stringify(notif)]);
+  }, [hydrated, onboarded, JSON.stringify(scheduleItems), JSON.stringify(assignments), JSON.stringify(savedEvents.map((e) => e.id)), JSON.stringify(notif), wake]);
 }
 
 export { DAY_TO_JS };

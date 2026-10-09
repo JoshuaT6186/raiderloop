@@ -22,7 +22,7 @@ const friendly = (e) => {
 
 export default function Account() {
   const { t } = useTheme();
-  const { set, userName } = useApp();
+  const { set, userName, claimData } = useApp();
   const [mode, setMode] = useState('create'); // create | signin
   const [name, setName] = useState(userName || '');
   const [email, setEmail] = useState('');
@@ -52,10 +52,12 @@ export default function Account() {
     try {
       if (mode === 'create') {
         if (!name.trim()) { setError('Add your first name so friends know it\'s you.'); setBusy(null); return; }
-        await emailSignUp(email.trim(), password, name.trim());
+        const nu = await emailSignUp(email.trim(), password, name.trim());
+        claimData(nu?.uid);
         next({ userName: name.trim() });
       } else {
         const u = await emailSignIn(email.trim(), password);
+        claimData(u?.uid);
         await continueAs(u, u.displayName ? { userName: u.displayName } : {});
       }
     } catch (e) { setError(friendly(e)); }
@@ -66,6 +68,7 @@ export default function Account() {
     setError(null); setBusy('apple');
     try {
       const res = await appleSignIn(AppleAuth, Crypto);
+      claimData((res.user || res)?.uid);
       await continueAs(res.user || res, res.name ? { userName: res.name } : {});
     } catch (e) { const m = friendly(e); if (m) setError(m); }
     setBusy(null);
@@ -73,7 +76,9 @@ export default function Account() {
 
   const guest = async () => {
     setBusy('guest');
-    try { await guestSignIn(); } catch (e) { /* offline is fine, local features still work */ }
+    let guestUid = null;
+    try { const r = await guestSignIn(); guestUid = r?.user?.uid || null; } catch (e) { /* offline is fine, local features still work */ }
+    claimData(guestUid); // a guest never sees the last account's schedule
     next();
     setBusy(null);
   };

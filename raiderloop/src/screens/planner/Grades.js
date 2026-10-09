@@ -41,7 +41,7 @@ export default function Grades() {
         </PostIt>
       </View>
 
-      <Section title="Courses" action={scheduleItems.length ? 'import classes' : undefined} onAction={importClasses} />
+      <Section title="Courses" action={scheduleItems.some((c) => !c.oneOff) ? 'import classes' : undefined} onAction={importClasses} />
       {courses.map((c) => {
         return (
           <Card key={c.id} style={{ marginBottom: 12 }}>

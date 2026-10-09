@@ -15,6 +15,7 @@ struct Snapshot: Decodable {
   let todayCount: Int
   let due: Due?
   let weather: String
+  let day: String?
 }
 
 struct Entry: TimelineEntry {
@@ -26,7 +27,13 @@ func loadSnapshot() -> Snapshot? {
   guard let defaults = UserDefaults(suiteName: appGroup),
         let raw = defaults.string(forKey: "snapshot"),
         let data = raw.data(using: .utf8) else { return nil }
-  return try? JSONDecoder().decode(Snapshot.self, from: data)
+  guard let snap = try? JSONDecoder().decode(Snapshot.self, from: data) else { return nil }
+  // A snapshot from an earlier day: keep what's due, drop yesterday's classes.
+  let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.locale = Locale(identifier: "en_US_POSIX")
+  if let day = snap.day, day != f.string(from: Date()) {
+    return Snapshot(next: nil, todayCount: 0, due: snap.due, weather: "", day: day)
+  }
+  return snap
 }
 
 struct Provider: TimelineProvider {

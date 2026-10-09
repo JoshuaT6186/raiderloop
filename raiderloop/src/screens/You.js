@@ -20,10 +20,12 @@ import { stopNearby } from '../lib/nearby';
 import { openUrl, shareText } from '../lib/links';
 import { sharingActive } from '../lib/location';
 import { APP, LIMITS, SCHOOLS, PURCHASES } from '../config';
-import { metaLine } from '../lib/time';
+import { metaLine, localDay } from '../lib/time';
 import { ORGS } from '../data/campus';
 import { CLASS_YEARS } from '../data/majors';
-import { ensureNotificationPermission } from '../lib/notifications';
+import { ensureNotificationPermission, clearScheduled } from '../lib/notifications';
+import { clearWidget } from '../lib/widget';
+import { logOutPurchases } from '../lib/monetize';
 
 function ProfileCard() {
   const { userName, userMajor, userClassYear, avatar, schoolId, profile, user, isPlus, set, setSheet } = useApp();
@@ -171,12 +173,23 @@ function Settings() {
   const { t } = useTheme();
   const app = useApp();
   const { theme, notif, set, user, resetAll, setSheet, isPlus, pilotUsedToday, pilotDay } = app;
-  const usage = pilotDay === new Date().toISOString().slice(0, 10) ? pilotUsedToday : 0;
+  const usage = pilotDay === localDay() ? pilotUsedToday : 0;
   const setN = (patch) => set((p) => ({ notif: { ...p.notif, ...patch } }));
 
-  const doSignOut = () => Alert.alert('Sign out?', 'This clears Flyer on this phone and takes you back to the start. Your account and friends stay saved.', [
+  const doSignOut = () => Alert.alert('Sign out?', "You'll go back to the start screen. Your account and friends stay saved, and your classes and assignments will be here when you sign back in on this phone.", [
     { text: 'Cancel', style: 'cancel' },
-    { text: 'Sign out', style: 'destructive', onPress: async () => { await api.stopSharing({}).catch(() => {}); await unregisterPush(); await stopNearby(); await signOut().catch(() => {}); resetAll(); } },
+    {
+      text: 'Sign out',
+      style: 'destructive',
+      onPress: async () => {
+        const owner = user?.uid || null;
+        await api.stopSharing({}).catch(() => {});
+        await unregisterPush(); await stopNearby();
+        await logOutPurchases(); await clearScheduled(); clearWidget();
+        await signOut().catch(() => {});
+        resetAll({ keepData: true, owner });
+      },
+    },
   ]);
   const doDelete = () => setSheet({ type: 'deleteAccount' });
 

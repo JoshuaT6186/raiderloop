@@ -14,8 +14,10 @@ const { onCall, onRequest } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { defineSecret } = require('firebase-functions/params');
 const { getAuth } = require('firebase-admin/auth');
+const { FieldPath } = require('firebase-admin/firestore');
 const C = require('./common');
 const S = require('./socialCore');
+const NF = require('./nameFilter');
 
 const { db, FieldValue, HttpsError, clean } = C;
 const REVENUECAT_WEBHOOK_AUTH = defineSecret('REVENUECAT_WEBHOOK_AUTH');
@@ -43,9 +45,11 @@ exports.requestSchool = onCall(C.callOpts(), async (request) => {
 
 /* ---------- Profile ---------- */
 async function assignHandle(uid, name) {
-  const base = (clean(name, 20).toLowerCase().replace(/[^a-z0-9]/g, '') || 'flyer').slice(0, 12);
+  let base = (clean(name, 20).toLowerCase().replace(/[^a-z0-9]/g, '') || 'flyer').slice(0, 12);
+  if (NF.isInappropriate(base, { strict: true })) base = 'flyer';
   for (let i = 0; i < 12; i++) {
     const handle = `${base}${Math.floor(10 + Math.random() * (i < 6 ? 90 : 9990))}`;
+    if (NF.isInappropriate(handle, { strict: true })) continue;
     const ref = db.collection('handles').doc(handle);
     try {
       await db.runTransaction(async (tx) => {
@@ -61,7 +65,7 @@ async function assignHandle(uid, name) {
 
 exports.saveProfile = onCall(C.callOpts(), async (request) => {
   const uid = C.requireAuth(request, { account: true });
-  const name = clean(request.data?.name, 40);
+  const name = NF.assertDisplayName(request.data?.name);
   const avatar = cleanAvatar(request.data?.avatar);
   const schoolId = clean(request.data?.schoolId, 20) || 'ttu';
   const ref = db.collection('users').doc(uid);
@@ -72,22 +76,33 @@ exports.saveProfile = onCall(C.callOpts(), async (request) => {
   const fresh = !handle;
   if (fresh) handle = await assignHandle(uid, name);
   const verifiedEmail = S.verifiedSchoolEmail(request, schoolId);
-  await ref.set({ name, avatar, schoolId, ...(fresh ? { handle } : {}), schoolVerified: !!verifiedEmail, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  await ref.set({ name, nameLower: name.toLowerCase(), avatar, schoolId, ...(fresh ? { handle } : {}), schoolVerified: !!verifiedEmail, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
   // Refresh my card inside each friend's list and each chat I'm in.
   const friends = await ref.collection('friends').get();
   const batch = db.batch();
-  friends.docs.forEach((f) => batch.set(db.doc(`users/${f.id}/friends/${uid}`), { name, avatar }, { merge: true }));
+  friends.docs.forEach((f) => batch.set(db.doc(`users/${f.id}/friends/${uid}`), { name, avatar, handle }, { merge: true }));
   const chats = await db.collection('chats').where('members', 'array-contains', uid).limit(100).get();
   chats.docs.forEach((c) => batch.set(c.ref, { memberCards: { [uid]: { name, avatar } } }, { merge: true }));
   await batch.commit();
   return { handle, schoolVerified: !!verifiedEmail };
 });
 
+/* Lets the app check a name while someone is still typing it, so they
+   get an answer on the spot instead of a silent failure later. Works
+   for guests too (onboarding happens before an account exists). */
+exports.checkName = onCall(C.callOpts(), async (request) => {
+  const uid = C.requireAuth(request);
+  await C.takeQuota(uid, 'nameCheck', 80, 'Too many tries. Give it a minute and try again.');
+  const r = NF.checkDisplayName(request.data?.name);
+  if (r.error) throw new HttpsError('invalid-argument', r.error);
+  return { ok: true, name: r.name };
+});
+
 /* ---------- Choose your own @username ----------
    Everyone gets one automatically (above); this lets them pick their
-   own. Lowercase letters, numbers and underscores, 3-20 long. Lookup is
-   exact-match only (sendFriendRequest) — there's no searchable list of
-   students. */
+   own. Lowercase letters, numbers and underscores, 3-20 long. People
+   search (searchPeople, below) matches the start of a name or username,
+   needs 3+ characters, returns a few results, and hides blocked people. */
 const RESERVED = new Set(['flyer', 'flyerapp', 'admin', 'administrator', 'support', 'help', 'helpdesk', 'official', 'staff', 'mod', 'moderator',
   'team', 'security', 'root', 'system', 'pilot', 'ttu', 'texastech', 'texas_tech', 'raider', 'raiders', 'redraider', 'redraiders', 'raiderred',
   'masked_rider', 'maskedrider', 'sga', 'police', 'ttupd', 'president', 'eternityworks', 'apple', 'google', 'null', 'undefined', 'everyone', 'me', 'you']);
@@ -99,7 +114,7 @@ function checkHandle(raw) {
   if (/^[0-9_]+$/.test(h)) return { error: 'Include at least one letter.' };
   if (/^_|_$|__/.test(h)) return { error: "Underscores can't be at the start, the end, or doubled." };
   if (RESERVED.has(h) || /^(flyer|admin|support|official|ttu|texastech)/.test(h)) return { error: 'That one is reserved. Try another.' };
-  if (require('./chatCore').censorText(h.replace(/_/g, ' ')) !== h.replace(/_/g, ' ')) return { error: 'Pick a different username.' };
+  if (NF.isInappropriate(h, { strict: true }) || NF.isInappropriate(h.replace(/_/g, ' '))) return { error: "That username isn't allowed. Pick a different one." };
   return { handle: h };
 }
 
@@ -167,6 +182,56 @@ exports.sendFriendRequest = onCall(C.callOpts(), async (request) => {
   return { ok: true };
 });
 
+/* ---------- Find people ----------
+   Matches the start of a first name or @username. Each result shows
+   the avatar, name, username and mutual friends, so you can be sure
+   it's the right person before sending a request. */
+exports.searchPeople = onCall(C.callOpts(), async (request) => {
+  const uid = C.requireAuth(request, { account: true });
+  const raw = clean(request.data?.q, 30).toLowerCase().trim();
+  const handleOnly = raw.startsWith('@'); // typing @ means "username", so skip names
+  const q = raw.replace(/^@/, '');
+  if (q.length < 3) return { results: [] };
+  await C.takeQuota(uid, 'search', 200, "That's a lot of searching today. Try again tomorrow.");
+  const end = `${q}`;
+  const ids = new Set();
+  let exactUid = null;
+  if (/^[a-z0-9_]+$/.test(q)) {
+    // Fetch extra: held usernames are filtered out after the query.
+    const hs = await db.collection('handles').where(FieldPath.documentId(), '>=', q).where(FieldPath.documentId(), '<', end).limit(16).get();
+    hs.docs.forEach((d) => {
+      const x = d.data();
+      if (!x.uid || x.heldUntil) return;
+      ids.add(x.uid);
+      if (d.id === q) exactUid = x.uid;
+    });
+  }
+  if (!handleOnly) {
+    const ns = await db.collection('users').where('nameLower', '>=', q).where('nameLower', '<', end).limit(10).get();
+    ns.docs.forEach((d) => ids.add(d.id));
+  }
+  ids.delete(uid);
+  const mine = await S.friendIds(uid);
+  const results = await Promise.all([...ids].slice(0, 12).map(async (id) => {
+    const [u, blocked, theirs, sent, incoming] = await Promise.all([
+      db.doc(`users/${id}`).get(), S.isBlocked(uid, id), S.friendIds(id),
+      db.doc(`users/${id}/requests/${uid}`).get(), db.doc(`users/${uid}/requests/${id}`).get(),
+    ]);
+    if (blocked || !u.exists || !u.data().handle) return null;
+    const d = u.data();
+    let mutual = 0;
+    theirs.forEach((f) => { if (mine.has(f)) mutual += 1; });
+    const status = mine.has(id) ? 'friend' : sent.exists ? 'requested' : incoming.exists ? 'incoming' : 'none';
+    // First name only: strangers don't see anyone's last name.
+    return { uid: id, name: S.firstName(d.name), handle: d.handle, avatar: d.avatar || {}, mutual, status };
+  }));
+  // An exact username match always comes first, then most mutual friends.
+  const list = results.filter(Boolean)
+    .sort((a, b) => (b.uid === exactUid) - (a.uid === exactUid) || b.mutual - a.mutual)
+    .slice(0, 8);
+  return { results: list };
+});
+
 exports.respondFriendRequest = onCall(C.callOpts(), async (request) => {
   const uid = C.requireAuth(request, { account: true });
   const from = clean(request.data?.uid, 64);
@@ -207,11 +272,12 @@ exports.blockUser = onCall(C.callOpts(), async (request) => {
 });
 
 /* ---------- Friends: expiring QR / invite codes ----------
-   A code is a short random token that lasts 5 minutes (QR shown in
-   person) or 24 hours (invite link you send). Scanning or opening one
-   makes you friends right away — showing the code is the owner's
-   consent, scanning it is yours. Because codes expire and can be
-   reset, a screenshot posted online stops working. */
+   A code is a short random token: 5 minutes for a QR shown in person,
+   24 hours for an older-style link, 7 days and ONE use for an invite
+   sent to someone who may not have Flyer yet. Using one makes you
+   friends right away: sharing the code is the owner's consent, using
+   it is yours. Codes expire, invites are single-use, and both can be
+   reset, so a screenshot posted online stops working. */
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function newToken(n = 8) {
   const bytes = crypto.randomBytes(n);
@@ -221,9 +287,14 @@ const normCode = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '').
 
 exports.createFriendCode = onCall(C.callOpts(), async (request) => {
   const uid = C.requireAuth(request, { account: true });
-  await C.takeQuota(uid, 'friendCode', 80, "That's a lot of new codes today. Try again tomorrow.");
-  const kind = request.data?.kind === 'link' ? 'link' : 'qr';
-  const ttl = kind === 'link' ? 24 * 3600000 : 5 * 60000;
+  const kind = ['link', 'invite'].includes(request.data?.kind) ? request.data.kind : 'qr';
+  // Invites have their own limit, so a QR screen left open (a new code
+  // every 5 minutes) can't use up the day's invites.
+  if (kind === 'invite') await C.takeQuota(uid, 'invite', 30, "That's a lot of invites today. Try again tomorrow.");
+  else await C.takeQuota(uid, 'friendCode', 80, "That's a lot of new codes today. Try again tomorrow.");
+  // An invite to someone who doesn't have Flyer yet needs time for them
+  // to download it and sign up.
+  const ttl = kind === 'invite' ? 7 * 24 * 3600000 : kind === 'link' ? 24 * 3600000 : 5 * 60000;
   const token = newToken(8);
   const expiresAt = Date.now() + ttl;
   await db.doc(`friendCodes/${token}`).set({ uid, kind, expiresAt, createdAt: FieldValue.serverTimestamp() });
@@ -239,11 +310,13 @@ exports.redeemFriendCode = onCall(C.callOpts(), async (request) => {
   if (!snap || !snap.exists) throw bad;
   const d = snap.data();
   if (d.expiresAt < Date.now()) throw bad;
-  if (d.uid === uid) throw new HttpsError('invalid-argument', "That's your own username!");
+  if (d.uid === uid) throw new HttpsError('invalid-argument', "That's your own code!");
   if (await S.isBlocked(uid, d.uid)) throw bad;
   const card = await S.publicCard(d.uid);
   if (await S.areFriends(uid, d.uid)) return { ok: true, already: true, name: card.name };
   await S.makeFriends(uid, d.uid);
+  // An invite is for one person: once used, a forwarded copy stops working.
+  if (d.kind === 'invite') await snap.ref.delete().catch(() => {});
   const me = await S.publicCard(uid);
   await C.sendPush([d.uid], { title: 'New friend', body: `You and ${S.firstName(me.name) || 'someone'} are now friends on Flyer.`, data: { open: 'friends' } });
   return { ok: true, name: card.name };

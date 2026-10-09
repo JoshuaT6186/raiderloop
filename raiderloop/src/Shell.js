@@ -28,7 +28,7 @@ import {
   ChatsSheet, ChatSheet, NewFlockSheet, ShareCardSheet, FlockBoardSheet,
 } from './sheets/Chats';
 import { FriendSheet, FindTimeSheet } from './sheets/FriendProfile';
-import QrFriendSheet, { parseFriendCode, redeemCode } from './sheets/QrFriend';
+import QrFriendSheet, { parseFriendCode } from './sheets/QrFriend';
 import { DeleteAccountSheet, HandleSheet } from './sheets/AccountExtras';
 import SyllabusSheet from './sheets/ScanSyllabus';
 import { usePushRegistration, useNotificationTaps } from './lib/push';
@@ -98,6 +98,28 @@ function ConflictPrompt() {
   );
 }
 
+/* flyer://add/CODE, from a QR scanned with the iPhone camera or an
+   invite link. Mounted during onboarding too, so someone who just
+   installed from an invite keeps it while they sign up. */
+const seenLinks = new Set();
+function LinkCatcher() {
+  const { set } = useApp();
+  useEffect(() => {
+    const handle = (url) => {
+      if (!url || seenLinks.has(url) || !/^flyer:\/\/add\//i.test(url)) return;
+      const code = parseFriendCode(url);
+      if (!code) return;
+      seenLinks.add(url);
+      set({ pendingInvite: code });
+    };
+    Linking.getInitialURL().then(handle).catch(() => {});
+    const sub = Linking.addEventListener('url', (e) => handle(e.url));
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return null;
+}
+
 function BackgroundJobs() {
   const app = useApp();
   const { user, sharing, schoolId, avatar, userName, set, scheduleItems, assignments, onboarded, adConsentAsked, isPlus } = app;
@@ -125,24 +147,37 @@ function BackgroundJobs() {
     else if (d.open === 'passport') setSheet({ type: 'passport' });
   });
 
-  /* flyer://add/CODE — from someone's QR scanned with the iPhone
-     camera, or an invite link. */
-  const handledLinks = useRef(new Set());
+  /* A friend code from a link (LinkCatcher saved it). Redeem it once
+     there's a real account. A guest is sent to make one first, and it's
+     redeemed automatically right after. */
+  const { pendingInvite, profile } = app;
+  const nudged = useRef(false);
+  const redeeming = useRef(false);
+  /* Wait for the server profile (it carries the username), so the
+     person who invited them sees a real name in their friends list. */
+  const profileReady = !!profile?.handle;
   useEffect(() => {
-    const handle = (url) => {
-      const m = /^flyer:\/\/add\/(.+)$/i.exec(url || '');
-      const code = m && parseFriendCode(m[1]);
-      if (!code) return;
-      if (signedIn && handledLinks.current.has(code)) return;
-      if (signedIn) handledLinks.current.add(code);
-      if (!signedIn) { setSheet({ type: 'account' }); showToast('Make an account, then open the link again.'); return; }
-      redeemCode(code, showToast);
-    };
-    Linking.getInitialURL().then(handle).catch(() => {});
-    const sub = Linking.addEventListener('url', (e) => handle(e.url));
-    return () => sub.remove();
+    if (!pendingInvite) return;
+    if (signedIn && profileReady) {
+      if (redeeming.current) return;
+      redeeming.current = true;
+      const code = pendingInvite;
+      api.redeemFriendCode({ code }).then((r) => {
+        set({ pendingInvite: null });
+        showToast(r.data.already ? `You and ${r.data.name || 'them'} are already friends` : `You and ${(r.data.name || 'your new friend').split(' ')[0]} are friends!`);
+      }).catch((e) => {
+        // A bad or expired code is dropped. A network blip keeps it for next time.
+        const permanent = ['functions/not-found', 'functions/invalid-argument', 'functions/already-exists', 'not-found', 'invalid-argument'].includes(e?.code);
+        if (permanent) set({ pendingInvite: null });
+        showToast(permanent ? "That invite didn't work. It may have expired, so ask for a new one." : "Couldn't add your friend yet. We'll try again next time you open Flyer.");
+      }).finally(() => { redeeming.current = false; });
+    } else if (!signedIn && user !== undefined && !nudged.current) {
+      nudged.current = true;
+      setSheet({ type: 'account' });
+      showToast("Make your account and you'll be friends automatically.");
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signedIn]);
+  }, [signedIn, profileReady, pendingInvite, user === undefined]);
 
   /* Keep the public profile (name, avatar, school) in sync.
      Debounced; only for real accounts. */
@@ -151,11 +186,15 @@ function BackgroundJobs() {
     if (!signedIn || !onboarded) return undefined;
     clearTimeout(t.current);
     t.current = setTimeout(() => {
-      api.saveProfile({ name: userName, avatar, schoolId }).catch(() => {});
+      api.saveProfile({ name: userName, avatar, schoolId }).catch((e) => {
+        // The server refused the name (it has the final say). Clear it so
+        // the profile can still save, and tell the person why.
+        if (/invalid-argument/.test(String(e?.code || ''))) { set({ userName: '' }); app.showToast("Flyer can't use that name, so it was cleared."); }
+      });
     }, 1200);
     return () => clearTimeout(t.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.uid, onboarded, userName, JSON.stringify(avatar), schoolId]);
+  }, [user?.uid, signedIn, onboarded, userName, JSON.stringify(avatar), schoolId]);
 
   /* Schedule sharing: send busy blocks (and full classes, only for
      friends set to "full") whenever the schedule or levels change. */
@@ -227,6 +266,7 @@ export default function Shell() {
     return (
       <View style={{ flex: 1 }}>
         <StatusBar barStyle={t.mode === 'dark' ? 'light-content' : 'dark-content'} />
+        <LinkCatcher />
         <Onboarding />
       </View>
     );
@@ -235,6 +275,7 @@ export default function Shell() {
   return (
     <View style={{ flex: 1, backgroundColor: t.paper }}>
       <StatusBar barStyle={t.mode === 'dark' ? 'light-content' : 'dark-content'} />
+      <LinkCatcher />
       <BackgroundJobs />
       {tab === 'home' ? <Home /> : null}
       {tab === 'discover' ? <Discover /> : null}

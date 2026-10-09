@@ -11,7 +11,7 @@
  */
 import { initializeApp, getApps } from 'firebase/app';
 import {
-  initializeAuth, getAuth, onAuthStateChanged, signInAnonymously,
+  initializeAuth, getAuth, onAuthStateChanged, onIdTokenChanged, signInAnonymously,
   createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut as fbSignOut,
   sendPasswordResetEmail, updateProfile, OAuthProvider, signInWithCredential,
   linkWithCredential, EmailAuthProvider,
@@ -91,7 +91,9 @@ export const api = {
   // account-only
   saveProfile: acct('saveProfile'),
   sendFriendRequest: acct('sendFriendRequest'),
+  searchPeople: acct('searchPeople'),
   setHandle: acct('setHandle'),
+  checkName: call('checkName'),
   respondFriendRequest: acct('respondFriendRequest'),
   removeFriend: acct('removeFriend'),
   blockUser: acct('blockUser'),
@@ -133,8 +135,22 @@ export const errText = (e, fallback = 'Something went wrong. Try again.') => {
   return msg;
 };
 
+/* Asks the server whether a first name is allowed (the server owns the
+   list, so the app and the server can never disagree). Returns a message
+   to show, or null when the name is fine. If the server can't be reached
+   it returns null: saving the profile checks again, so nothing slips by. */
+export async function nameProblem(name) {
+  const n = String(name || '').trim();
+  if (!n) return null;
+  try { await api.checkName({ name: n }); return null; } catch (e) {
+    return /invalid-argument/.test(String(e?.code || '')) ? errText(e, "That name isn't allowed on Flyer.") : null;
+  }
+}
+
 /* ---------- auth helpers ---------- */
-export const onAuth = (cb) => onAuthStateChanged(auth, cb);
+/* onIdTokenChanged (not onAuthStateChanged) so upgrading a guest to a
+   real account, which keeps the same uid, is noticed too. */
+export const onAuth = (cb) => onIdTokenChanged(auth, cb);
 export const guestSignIn = () => signInAnonymously(auth);
 
 /* If someone started as a guest, creating an account LINKS to the
@@ -170,12 +186,24 @@ async function appleCredential(AppleAuth, Crypto) {
 export async function appleSignIn(AppleAuth, Crypto) {
   const { res, credential } = await appleCredential(AppleAuth, Crypto);
   const cur = auth.currentUser;
-  const result = cur && cur.isAnonymous
-    ? await linkWithCredential(cur, credential).catch(() => signInWithCredential(auth, credential))
-    : await signInWithCredential(auth, credential);
+  let result;
+  if (cur && cur.isAnonymous) {
+    try {
+      result = await linkWithCredential(cur, credential);
+    } catch (e) {
+      // This Apple ID already has a Flyer account: sign in to it. Any
+      // other error (network, cancelled) is passed up, not swallowed.
+      if (e?.code !== 'auth/credential-already-in-use') throw e;
+      const existing = OAuthProvider.credentialFromError(e);
+      if (!existing) throw e;
+      result = await signInWithCredential(auth, existing);
+    }
+  } else {
+    result = await signInWithCredential(auth, credential);
+  }
   const name = [res.fullName?.givenName, res.fullName?.familyName].filter(Boolean).join(' ');
   if (name && !result.user.displayName) await updateProfile(result.user, { displayName: name }).catch(() => {});
-  return { user: result.user, name };
+  return { user: result.user, name, switched: !!cur && cur.uid !== result.user.uid };
 }
 
 export const isAppleUser = () => !!auth.currentUser?.providerData?.some((p) => p.providerId === 'apple.com');
@@ -223,12 +251,16 @@ export function listenMyProfile(uid, cb) {
 }
 /* One-time read of my server profile (null if there isn't one yet or
    it can't be reached). Used to recognise a returning account. */
-export function getMyProfile(uid, timeoutMs = 6000) {
+export function getMyProfile(uid, timeoutMs = 8000) {
   return new Promise((resolve) => {
     let done = false; let off = () => {};
     const finish = (v) => { if (done) return; done = true; clearTimeout(timer); try { off(); } catch (e) { /* already closed */ } resolve(v); };
     const timer = setTimeout(() => finish(null), timeoutMs);
-    off = onSnapshot(doc(db, 'users', uid), (s) => finish(s.exists() ? s.data() : null), () => finish(null));
+    off = onSnapshot(doc(db, 'users', uid), (s) => {
+      // A "doesn't exist" answer from the offline cache isn't trustworthy; wait for the server.
+      if (!s.exists() && s.metadata.fromCache) return;
+      finish(s.exists() ? s.data() : null);
+    }, () => finish(null));
     if (done) off();
   });
 }

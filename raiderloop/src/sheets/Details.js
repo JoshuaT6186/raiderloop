@@ -118,7 +118,7 @@ export function BuildingSheet({ id, onClose }) {
   const dining = DINING.filter((d) => d.buildingId === b.id);
   const stops = BUS_STOPS.filter((s) => s.buildingId === b.id);
   const resources = RESOURCES.filter((r) => r.buildingId === b.id);
-  const myClasses = scheduleItems.filter((c) => c.buildingId === b.id);
+  const myClasses = scheduleItems.filter((c) => !c.oneOff && c.buildingId === b.id);
   return (
     <Sheet title={b.name} hand={metaLine(catLabel(b.kind), walkLabel(b))} onClose={onClose}
       footer={<Button title="Walking directions" icon="walk" onPress={() => openDirections(b)} />}>

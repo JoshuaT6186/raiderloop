@@ -10,8 +10,19 @@ export function todayCode(d = new Date()) {
   return ['Su', 'M', 'T', 'W', 'Th', 'F', 'Sa'][d.getDay()];
 }
 
+/* "2026-10-08" in the phone's own time zone (not UTC, which rolls over
+   at 7 PM in Lubbock). */
+export function localDay(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/* A one-off item (an event added "to today") belongs to the date it was
+   added. After that day it no longer shows, instead of repeating on
+   that weekday every week. */
+export const isStaleOneOff = (i, today = localDay()) => !!i.oneOff && i.onDate !== today;
+
 export function itemsOnDay(items, code) {
-  return items.filter((i) => !i.days || i.days.includes(code));
+  return items.filter((i) => !isStaleOneOff(i) && (!i.days || i.days.includes(code)));
 }
 
 /** "9:00 AM" → minutes since midnight, or null */

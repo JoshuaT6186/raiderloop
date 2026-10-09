@@ -222,7 +222,7 @@ function parseJsonObject(text) {
 }
 
 function recencyGuard() {
-  const d = new Date().toISOString().slice(0, 10);
+  const d = chicagoDay(); // Lubbock's date, not UTC's (which flips at 7 PM)
   return `
 TODAY'S REAL DATE IS ${d}. You have no clock of your own. Use that date, and only that date, to judge whether something is current.
 

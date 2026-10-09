@@ -349,7 +349,7 @@ export function ChatSheet({ chatId: initialId, withUid, onClose }) {
           <T kind="small" style={{ fontSize: 11, marginTop: 6, textAlign: 'center' }}>Hold a message to report it or block the sender.</T>
         </View>
       )}>
-      <ScrollView ref={scroller} style={{ height: 470 }} contentContainerStyle={{ paddingBottom: 10 }} keyboardShouldPersistTaps="handled">
+      <ScrollView ref={scroller} style={{ height: 470, flexShrink: 1 }} onLayout={() => scroller.current?.scrollToEnd({ animated: false })} contentContainerStyle={{ paddingBottom: 10 }} keyboardShouldPersistTaps="handled">
         {msgs === null ? <Loading label="Opening…" /> : !visible.length ? <Empty icon="chat" title="No messages yet" body="Say hi, share a class, or send a meetup card." /> : visible.map((m, i) => {
           if (m.kind === 'system') return <T key={m.id} kind="small" style={{ textAlign: 'center', marginVertical: 6 }}>{m.text}</T>;
           const mine = m.from === me;
