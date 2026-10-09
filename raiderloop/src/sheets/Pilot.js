@@ -25,8 +25,9 @@ import {
   itemsOnDay, todayCode, toMinutes, sortByTime, dueLabel, metaLine, localDay,
 } from '../lib/time';
 import {
-  BUILDINGS, ORGS, DINING, RESOURCES, buildingById, catLabel, walkLabel, nextGame, gameDateLabel,
+  BUILDINGS, ORGS, DINING, RESOURCES, buildingById, catLabel, walkLabel, walkMinsFor, nextGame, gameDateLabel,
 } from '../data/campus';
+import { useHere } from '../lib/here';
 import { openUrl } from '../lib/links';
 import { LIMITS, SAFETY } from '../config';
 import { ImagePicker } from '../lib/native';
@@ -66,6 +67,7 @@ function buildContext({ scheduleItems, assignments, weather, userMajor, userClas
 }
 
 export default function Pilot({ onClose }) {
+  const here = useHere();
   const { t } = useTheme();
   const app = useApp();
   const { scheduleItems, assignments, savedEvents, goToBuilding, setSheet, setTab, pilotSeed, setPilotSeed, notePilotUse, isPlus, pilotUsedToday, pilotDay, schoolId, user, set } = app;
@@ -91,7 +93,7 @@ export default function Pilot({ onClose }) {
       const next = todays.find((i) => (toMinutes(i.endTime) ?? toMinutes(i.time) ?? 0) > nowM);
       if (!next) return { text: todays.length || scheduleItems.some((i) => !i.oneOff) ? "You're done with classes for today." : "You haven't added any classes yet. Add them in the Planner and I'll know." };
       const b = buildingById(next.buildingId);
-      return { text: `${next.title} at ${next.time} in ${next.place || b?.name}.${b?.walk ? ` About a ${b.walk}-minute walk.` : ''}`, buildingId: next.buildingId };
+      return { text: `${next.title} at ${next.time} in ${next.place || b?.name}.${walkMinsFor(b, here) ? ` About a ${walkMinsFor(b, here)}-minute walk from you.` : ''}`, buildingId: next.buildingId };
     }
     if (/due|assignment|homework/.test(low)) {
       const due = assignments.filter((a) => !a.done && a.due).sort((a, b) => new Date(a.due) - new Date(b.due));
@@ -105,7 +107,7 @@ export default function Pilot({ onClose }) {
       return { text: `It's ${weather.temp}° and ${weather.condition.toLowerCase()} in Lubbock. High ${weather.hi}°, low ${weather.lo}°.` };
     }
     if (/(eat|food|hungry|lunch|dinner|breakfast|coffee).*(open|now)|open.*(eat|food)|what.*open/.test(low)) {
-      const open = DINING.filter((d) => isOpenNow(d.hours) === true).sort((a, b) => (a.walk ?? 99) - (b.walk ?? 99));
+      const open = DINING.filter((d) => isOpenNow(d.hours) === true).sort((a, b) => (walkMinsFor(a, here) ?? 99) - (walkMinsFor(b, here) ?? 99));
       if (!open.length) return { text: 'None of the on-campus dining spots with posted hours are open right now.' };
       return { text: `${open.length} spots are open now. Closest:`, diningIds: open.slice(0, 4).map((d) => d.id) };
     }
@@ -235,8 +237,8 @@ export default function Pilot({ onClose }) {
             </PostIt>
             <View style={{ marginTop: 6 }}>
               {m.hit.buildingId ? <Row title={buildingById(m.hit.buildingId)?.name} meta="Show on map" onPress={() => { onClose(); goToBuilding(m.hit.buildingId); }} /> : null}
-              {(m.hit.buildingIds || []).map((id) => { const b = buildingById(id); return b ? <Row key={id} title={b.name} meta={metaLine(catLabel(b.kind), walkLabel(b))} onPress={() => { onClose(); goToBuilding(id); }} /> : null; })}
-              {(m.hit.diningIds || []).map((id) => { const d = DINING.find((x) => x.id === id); return d ? <Row key={id} title={d.name} meta={metaLine(d.venue, d.walk ? `${d.walk} min walk` : null)} onPress={() => { onClose(); setSheet({ type: 'dining', id }); }} /> : null; })}
+              {(m.hit.buildingIds || []).map((id) => { const b = buildingById(id); return b ? <Row key={id} title={b.name} meta={metaLine(catLabel(b.kind), walkLabel(b, here))} onPress={() => { onClose(); goToBuilding(id); }} /> : null; })}
+              {(m.hit.diningIds || []).map((id) => { const d = DINING.find((x) => x.id === id); return d ? <Row key={id} title={d.name} meta={metaLine(d.venue, walkLabel(d, here) || null)} onPress={() => { onClose(); setSheet({ type: 'dining', id }); }} /> : null; })}
               {(m.hit.resourceIds || []).map((id) => { const r = RESOURCES.find((x) => x.id === id); return r ? <Row key={id} title={r.name} meta={r.kind} onPress={() => (r.url ? openUrl(r.url) : (onClose(), goToBuilding(r.buildingId)))} /> : null; })}
               {(m.hit.sources || []).slice(0, 3).map((s) => <Row key={s.url} title={s.title || s.url} meta="Source" onPress={() => openUrl(s.url)} />)}
               {m.hit.tab ? <Row title={m.hit.tab === 'schedule' ? 'Open Planner' : 'Open You'} onPress={() => { onClose(); setTab(m.hit.tab); }} /> : null}

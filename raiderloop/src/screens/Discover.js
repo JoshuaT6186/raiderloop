@@ -21,8 +21,9 @@ import { openUrl } from '../lib/links';
 import { BannerAd, affiliateSearchUrl, isAffiliate } from '../lib/monetize';
 import {
   ORGS, DINING, BUILDINGS, STUDY, RESOURCES, QUICK_LINKS, GREEK_ORGS, ORG_CATEGORIES, orgsForInterests,
-  nextGame, lastGame, gameDateLabel, SPORTS_LIST, catLabel, walkLabel, FOOTBALL_SCHEDULE,
+  nextGame, lastGame, gameDateLabel, SPORTS_LIST, catLabel, walkLabel, walkMinsFor, FOOTBALL_SCHEDULE,
 } from '../data/campus';
+import { useHere } from '../lib/here';
 
 const CARD_W = SCREEN_W * 0.62;
 
@@ -173,8 +174,9 @@ function ForYou() {
 /* ---------- Dining ---------- */
 function DiningList() {
   const { t } = useTheme();
+  useHere();
   const { setSheet } = useApp();
-  const sorted = [...DINING].sort((a, b) => (isOpenNow(b.hours) === true) - (isOpenNow(a.hours) === true) || (a.walk ?? 99) - (b.walk ?? 99));
+  const sorted = [...DINING].sort((a, b) => (isOpenNow(b.hours) === true) - (isOpenNow(a.hours) === true) || (walkMinsFor(a) ?? 99) - (walkMinsFor(b) ?? 99));
   const [all, setAll] = useState(false);
   const shown = all ? sorted : sorted.slice(0, 6);
   return (
@@ -217,6 +219,7 @@ export function SportsSheet({ onClose }) {
 
 /* ---------- Screen ---------- */
 export default function Discover() {
+  useHere(); // refreshes walk times shown on this page
   const { t } = useTheme();
   const { setSheet, isPlus } = useApp();
   const [q, setQ] = useState('');

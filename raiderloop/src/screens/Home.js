@@ -19,7 +19,8 @@ import { api } from '../lib/firebase';
 import {
   itemsOnDay, todayCode, toMinutes, sortByTime, greeting, dueLabel, daysUntil, metaLine, dateAt,
 } from '../lib/time';
-import { buildingById, walkLabel, nextGame, gameDateLabel, floorPlanFor } from '../data/campus';
+import { buildingById, walkMinsFor, nextGame, gameDateLabel, floorPlanFor } from '../data/campus';
+import { useHere } from '../lib/here';
 import { openDirections, openUrl } from '../lib/links';
 import { BannerAd } from '../lib/monetize';
 import { TERM } from '../config';
@@ -48,6 +49,7 @@ function WeatherNote({ w, nextClass }) {
 }
 
 function UpNext({ next, now }) {
+  const here = useHere();
   const { t } = useTheme();
   const { setTab } = useApp();
   if (!next) {
@@ -63,6 +65,7 @@ function UpNext({ next, now }) {
   const inMin = startM - nowM;
   const happening = inMin <= 0;
   const plan = floorPlanFor(b);
+  const walk = walkMinsFor(b, here);
   return (
     <Card>
       <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
@@ -77,11 +80,11 @@ function UpNext({ next, now }) {
       </View>
       {b ? (
         <View style={{ flexDirection: 'row', marginTop: 12 }}>
-          <Button title={walkLabel(b) || 'Directions'} icon="walk" small onPress={() => openDirections(b)} style={{ marginRight: 8 }} />
+          <Button title={walk ? `${walk} min walk` : 'Directions'} icon="walk" small onPress={() => openDirections(b)} style={{ marginRight: 8 }} />
           {plan ? <Button title="Floor plan" icon="layers" small kind="ghost" onPress={() => openUrl(plan.url)} /> : null}
         </View>
       ) : null}
-      {!happening && b && b.walk && inMin <= b.walk + 5 && inMin > 0 ? <T kind="small" color={t.redPen} style={{ marginTop: 8 }}>Leave now. It's about a {b.walk}-minute walk.</T> : null}
+      {!happening && walk && inMin <= walk + 5 && inMin > 0 ? <T kind="small" color={t.redPen} style={{ marginTop: 8 }}>Leave now. It's about a {walk}-minute walk.</T> : null}
     </Card>
   );
 }

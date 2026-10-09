@@ -36,7 +36,7 @@ export function OpenNowSheet({ onClose }) {
       .filter((x) => isOpenNow(x.hours) === true)
       .map((x) => {
         const m = pos ? distanceM(pos, x) : null;
-        return { ...x, mins: m != null ? walkMinutes(m) : x.walk, closesIn: minutesUntilClose(x.hours) };
+        return { ...x, mins: m != null ? walkMinutes(m) : null, closesIn: minutesUntilClose(x.hours) };
       })
       .sort((a, b) => (a.mins ?? 99) - (b.mins ?? 99));
   }, [pos]);

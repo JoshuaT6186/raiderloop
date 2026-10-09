@@ -15,6 +15,7 @@ import { metaLine } from '../lib/time';
 import {
   buildingById, catLabel, walkLabel, floorPlanFor, ORGS, DINING, BUS_STOPS, RESOURCES, isGreek,
 } from '../data/campus';
+import { useHere } from '../lib/here';
 import { placeById } from '../data/places';
 import { CheckInCard, RatingSummary, AutoCheckInNote, DWELL_MIN } from './PlaceExtras';
 
@@ -47,6 +48,7 @@ function eventLive(ev, now = Date.now()) {
 }
 
 export function EventSheet({ ev, onClose }) {
+  useHere();
   const { t } = useTheme();
   const { isSaved, toggleSave, addEventToSchedule, setSheet } = useApp();
   const saved = isSaved(ev.id);
@@ -110,6 +112,7 @@ export function OrgSheet({ id, onClose }) {
 
 /* ---------- Building ---------- */
 export function BuildingSheet({ id, onClose }) {
+  useHere();
   const { t } = useTheme();
   const { setSheet, scheduleItems } = useApp();
   const b = buildingById(id);
@@ -154,6 +157,7 @@ export function BuildingSheet({ id, onClose }) {
 
 /* ---------- Dining ---------- */
 export function DiningSheet({ id, onClose }) {
+  useHere();
   const d = DINING.find((x) => x.id === id);
   const detail = useCallable(api.getDiningHallDetail, { hallName: d?.venue }, null, { asArray: false, enabled: !!d && !d.concepts?.length });
   if (!d) return null;

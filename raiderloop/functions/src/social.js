@@ -146,15 +146,18 @@ exports.setHandle = onCall(C.callOpts(), async (request) => {
     if (old) tx.set(db.collection('handles').doc(old), { uid, heldUntil: Date.now() + HANDLE_HOLD_MS });
     tx.set(userRef, { handle, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
   });
-  // Update my card in friends' lists and in requests I've sent.
-  const [friends, sent] = await Promise.all([
-    userRef.collection('friends').get(),
-    db.collectionGroup('requests').where('fromUid', '==', uid).limit(200).get(),
-  ]);
-  const batch = db.batch();
-  friends.docs.forEach((f) => batch.set(db.doc(`users/${f.id}/friends/${uid}`), { handle }, { merge: true }));
-  sent.docs.forEach((r) => batch.set(r.ref, { handle }, { merge: true }));
-  await batch.commit();
+  // Update my card in friends' lists and in requests I've sent. The
+  // username itself is already saved above, so a hiccup here (like a
+  // missing index) must not make the app say the change failed.
+  try {
+    const friends = await userRef.collection('friends').get();
+    const sent = await db.collectionGroup('requests').where('fromUid', '==', uid).limit(200).get()
+      .catch((e) => { console.warn('setHandle: sent requests not updated', e.message); return { docs: [] }; });
+    const batch = db.batch();
+    friends.docs.forEach((f) => batch.set(db.doc(`users/${f.id}/friends/${uid}`), { handle }, { merge: true }));
+    sent.docs.forEach((r) => batch.set(r.ref, { handle }, { merge: true }));
+    await batch.commit();
+  } catch (e) { console.warn('setHandle: cards not refreshed', e.message); }
   return { handle };
 });
 
@@ -193,7 +196,7 @@ exports.searchPeople = onCall(C.callOpts(), async (request) => {
   const q = raw.replace(/^@/, '');
   if (q.length < 3) return { results: [] };
   await C.takeQuota(uid, 'search', 200, "That's a lot of searching today. Try again tomorrow.");
-  const end = `${q}`;
+  const end = `${q}\uf8ff`; // everything that starts with q
   const ids = new Set();
   let exactUid = null;
   if (/^[a-z0-9_]+$/.test(q)) {

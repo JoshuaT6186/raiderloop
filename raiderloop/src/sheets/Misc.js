@@ -14,7 +14,7 @@ import { expiryFor, getForegroundPermission, sharingActive } from '../lib/locati
 import { emailSignUp, appleSignIn, getMyProfile, nameProblem } from '../lib/firebase';
 import { DEFAULT_AVATAR } from '../ui/avatarParts';
 import { AppleAuth, Crypto } from '../lib/native';
-import { getPlusOffering, getPlusProduct, buyPlus, restorePlus, purchasesAvailable, plusLoadNote } from '../lib/monetize';
+import { getPlusOffering, getPlusProduct, buyPlus, restorePlus, purchasesAvailable } from '../lib/monetize';
 import { APP, LIMITS, PURCHASES } from '../config';
 
 /* ---------- Gameday ---------- */
@@ -99,9 +99,7 @@ export function PlusSheet({ onClose }) {
     <Sheet title="Flyer Plus" hand="Everything stays free. Plus is a thank-you with perks." onClose={onClose}
       footer={(
         <View>
-          {!purchasesAvailable() ? <T kind="small" style={{ marginBottom: 8 }}>Flyer Plus isn't available yet. Check back soon.</T> : null}
-          {purchasesAvailable() && offering !== undefined && !pkg ? <T kind="small" style={{ marginBottom: 8 }}>{`Plus can't load right now. ${plusLoadNote}`}</T> : null}
-          {hasAccount ? (
+          {!purchasesAvailable() ? <T kind="small" style={{ marginBottom: 8 }}>Flyer Plus isn't available yet. Check back soon.</T> : null}          {hasAccount ? (
             <Button title={pkg ? `Get Plus · ${price}` : 'Get Plus'} icon="crown" kind="highlight" loading={busy || (purchasesAvailable() && offering === undefined)} disabled={!pkg} onPress={buy} />
           ) : (
             <>

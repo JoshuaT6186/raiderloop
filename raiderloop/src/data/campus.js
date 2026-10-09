@@ -12,7 +12,24 @@ import { isOpenNow } from '../lib/hours';
 export { BUILDINGS, DINING, ORGS };
 
 export const buildingById = (id) => BUILDINGS.find((b) => b.id === id);
-export const walkLabel = (b) => (b && b.walk ? `${b.walk} min walk` : '');
+/* Walk times are measured from where the student actually is. The
+   old fixed b.walk numbers were from the middle of campus, so a class
+   across campus could show 4 min when it's really 15. With no location
+   (permission off, or off campus) we show no number at all rather than
+   a wrong one. */
+let herePos = null;
+export const setHere = (p) => { herePos = p || null; };
+export const getHere = () => herePos;
+const MAX_WALK_M = 4000; // farther than this, a walk time isn't useful
+export function walkMinsFor(x, pos = herePos) {
+  if (!x || !pos) return null;
+  const place = x.lat != null ? x : (x.buildingId ? BUILDINGS.find((b) => b.id === x.buildingId) : null);
+  if (!place || place.lat == null) return null;
+  const m = distanceM(pos, place);
+  if (m == null || m > MAX_WALK_M) return null;
+  return walkMinutes(m);
+}
+export const walkLabel = (b, pos) => { const n = walkMinsFor(b, pos); return n ? `${n} min walk` : ''; };
 
 export const CAT_LABELS = { Worship: 'Faith & Spiritual Life' };
 export const catLabel = (c) => CAT_LABELS[c] || c;
@@ -226,5 +243,8 @@ export function distanceM(a, b) {
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(toR(a.lat)) * Math.cos(toR(b.lat)) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h));
 }
-/* ~1.35 m/s walking pace, same assumption as the original walk times. */
-export const walkMinutes = (m) => (m == null ? null : Math.max(1, Math.round(m / 1.35 / 60)));
+/* Straight-line distance undercounts real walks (buildings, paths,
+   crossings), so it's stretched by a route factor of 1.3, then walked
+   at ~1.34 m/s (about 3 mph). */
+const ROUTE_FACTOR = 1.3;
+export const walkMinutes = (m) => (m == null ? null : Math.max(1, Math.round((m * ROUTE_FACTOR) / 1.34 / 60)));

@@ -135,7 +135,7 @@ export function HandleSheet({ onClose }) {
       </View>
       {local || error ? <T kind="small" color={t.redPen} style={{ marginTop: -6, marginBottom: 10 }}>{local || error}</T> : null}
       <T kind="small">3 to 20 letters, numbers or underscores. People can only find you by typing your exact username. Flyer doesn't have a list of students to browse.</T>
-      <T kind="small" color={t.pencil} style={{ marginTop: 8 }}>If you change it, your old username stops working and someone else can take it.</T>
+      <T kind="small" color={t.pencil} style={{ marginTop: 8 }}>If you change it, your old username stops working right away. It's held for you for 30 days so no one else can grab it.</T>
     </Sheet>
   );
 }

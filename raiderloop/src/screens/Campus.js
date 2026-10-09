@@ -116,7 +116,7 @@ export default function Campus() {
     const s = q.trim().toLowerCase();
     let l = cat === 'All' ? BUILDINGS : cat === 'Open now' ? BUILDINGS.filter((b) => isOpenNow(b.hours) === true) : BUILDINGS.filter((b) => b.kind === cat);
     if (s) l = l.filter((b) => b.name.toLowerCase().includes(s));
-    return l.map((b) => ({ ...b, mins: pos ? walkMinutes(distanceM(pos, b)) : b.walk })).sort((a, b) => (a.mins ?? 99) - (b.mins ?? 99));
+    return l.map((b) => ({ ...b, mins: pos ? walkMinutes(distanceM(pos, b)) : null })).sort((a, b) => (a.mins ?? 99) - (b.mins ?? 99));
   }, [cat, q, pos]);
 
   const MapView = Maps?.default; const Marker = Maps?.Marker;

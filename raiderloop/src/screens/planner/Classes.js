@@ -17,6 +17,7 @@ import {
 import { useNow } from '../../lib/hooks';
 import { exportToCalendar } from '../../lib/calendarExport';
 import { buildingById, walkLabel } from '../../data/campus';
+import { useHere } from '../../lib/here';
 import { openDirections } from '../../lib/links';
 
 function hoursOn(items, d) {
@@ -24,6 +25,7 @@ function hoursOn(items, d) {
 }
 
 export default function Classes() {
+  const here = useHere();
   const { t } = useTheme();
   const { scheduleItems, addClass, updateClass, removeClass, assignments, showToast, setSheet } = useApp();
   const now = useNow(30000);
@@ -98,7 +100,7 @@ export default function Classes() {
                   <PT kind="bold" style={{ flex: 1 }}>{c.title}</PT>
                   {live ? <Highlight><PT kind="tiny">now</PT></Highlight> : null}
                 </View>
-                <PT kind="small">{metaLine(c.place, b ? walkLabel(b) : null)}</PT>
+                <PT kind="small">{metaLine(c.place, b ? walkLabel(b, here) : null)}</PT>
                 {b && !done ? (
                   <Pressable onPress={() => openDirections(b)} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }} hitSlop={6}>
                     <Icon name="walk" size={15} color="#2F5DA8" /><PT kind="small" style={{ marginLeft: 4, color: '#2F5DA8', fontWeight: '700' }}>Directions</PT>
