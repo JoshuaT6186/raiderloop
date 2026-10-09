@@ -122,7 +122,9 @@ If you can't confidently read a field, omit that entry. If the image isn't a sch
    quiz, exam and project. The app shows the list for the student to
    check before anything is added, because a missed or wrong due date
    is worse than none. Only dates actually written in the syllabus come
-   back — "Week 5" without a calendar date is skipped, never guessed. */
+   back. Tasks under a written week range (9/21 - 9/25) are due on the
+   range's last day and labeled "(wk of 9/21)"; "Week 5" with no dates
+   anywhere is skipped, never guessed. */
 const KINDS = ['assignment', 'quiz', 'exam', 'project', 'other'];
 function termContext() {
   const [y, m] = C.chicagoDay().split('-').map(Number);
@@ -163,7 +165,9 @@ Return ONLY a JSON object, nothing else:
 { "course": string|null (course code as written, e.g. "MATH 1314"), "items": [ { "title": string (short, as the syllabus names it, e.g. "Exam 2", "Lab report 3"), "kind": "assignment"|"quiz"|"exam"|"project"|"other", "date": "YYYY-MM-DD", "time": "HH:MM" (24-hour) or null } ] }
 
 Rules:
-- Only include an item if the syllabus states its calendar date (or a schedule table row gives the date). If it only says "Week 5", "TBA" or "see Canvas", leave it out. Never estimate a date.
+- Only include an item if the syllabus gives it a calendar date, either directly or through a schedule table row.
+- Weekly schedule tables: when tasks are listed under a row with a written date range (e.g. "WEEK 5 (9/21 - 9/25)"), each graded task in that row is due by the LAST date of that range. Use that last date, and end the title with " (wk of M/D)" using the FIRST date of the range, e.g. "Exam 1 Review (wk of 9/21)". Do not guess a day inside the range.
+- If it only says "Week 5" with no dates anywhere, "TBA" or "see Canvas", leave it out. Never invent a date.
 - Include exams, quizzes, papers, projects, labs, presentations and homework that are due on specific dates. Skip readings and class topics that aren't due.
 - If a time is written (e.g. "due 11:59 PM"), include it; otherwise time is null.
 - If the same deadline rule applies to many dated items in a table, list each dated item.
@@ -182,7 +186,7 @@ Rules:
   }
   const seen = new Set();
   const items = (Array.isArray(out.items) ? out.items : []).map((i) => ({
-    title: C.clean(i && i.title, 80),
+    title: C.clean(i && i.title, 90),
     kind: KINDS.includes(i && i.kind) ? i.kind : 'other',
     date: realDate(i && i.date) ? i.date : null,
     time: /^([01]\d|2[0-3]):[0-5]\d$/.test(String(i && i.time)) ? i.time : null,
