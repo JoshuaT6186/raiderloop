@@ -14,7 +14,7 @@ import { expiryFor, getForegroundPermission, sharingActive } from '../lib/locati
 import { emailSignUp, appleSignIn, getMyProfile, nameProblem } from '../lib/firebase';
 import { DEFAULT_AVATAR } from '../ui/avatarParts';
 import { AppleAuth, Crypto } from '../lib/native';
-import { getPlusOffering, buyPlus, restorePlus, purchasesAvailable } from '../lib/monetize';
+import { getPlusOffering, getPlusProduct, buyPlus, restorePlus, purchasesAvailable, plusLoadNote } from '../lib/monetize';
 import { APP, LIMITS, PURCHASES } from '../config';
 
 /* ---------- Gameday ---------- */
@@ -70,10 +70,17 @@ export function PlusSheet({ onClose }) {
   const { set, showToast, user, setSheet } = useApp();
   const [offering, setOffering] = useState(undefined);
   const [busy, setBusy] = useState(false);
-  useEffect(() => { getPlusOffering().then(setOffering); }, []);
-  const pkg = offering?.monthly || offering?.availablePackages?.[0];
+  const [direct, setDirect] = useState(null);
+  useEffect(() => {
+    (async () => {
+      const o = await getPlusOffering();
+      if (!o) setDirect(await getPlusProduct());
+      setOffering(o);
+    })();
+  }, []);
+  const pkg = offering?.monthly || offering?.availablePackages?.[0] || direct;
   const hasAccount = !!user && !user.isAnonymous;
-  const price = pkg ? `${pkg.product.priceString}/month` : PURCHASES.priceHint.replace('/mo', '/month');
+  const price = pkg ? `${(pkg.product || pkg).priceString}/month` : PURCHASES.priceHint.replace('/mo', '/month');
   const perks = [
     ['tag', 'No ads, anywhere'],
     ['plane', `${LIMITS.pilotPlus} Pilot questions a day (instead of ${LIMITS.pilotFree})`],
@@ -93,6 +100,7 @@ export function PlusSheet({ onClose }) {
       footer={(
         <View>
           {!purchasesAvailable() ? <T kind="small" style={{ marginBottom: 8 }}>Flyer Plus isn't available yet. Check back soon.</T> : null}
+          {purchasesAvailable() && offering !== undefined && !pkg ? <T kind="small" style={{ marginBottom: 8 }}>{`Plus can't load right now. ${plusLoadNote}`}</T> : null}
           {hasAccount ? (
             <Button title={pkg ? `Get Plus · ${price}` : 'Get Plus'} icon="crown" kind="highlight" loading={busy || (purchasesAvailable() && offering === undefined)} disabled={!pkg} onPress={buy} />
           ) : (

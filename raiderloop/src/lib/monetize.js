@@ -87,16 +87,45 @@ export async function checkPlus() {
   } catch (e) { return null; }
 }
 
+/* Why Plus couldn't load, in plain words, so the paywall can say so
+   instead of just greying out. */
+export let plusLoadNote = '';
+const PRODUCT_ID = 'flyer_plus_monthly';
+
 export async function getPlusOffering() {
+  plusLoadNote = '';
   if (!purchasesAvailable()) return null;
   try {
     const o = await Purchases.getOfferings();
-    return o.current || null;
-  } catch (e) { return null; }
+    if (!o.current) { plusLoadNote = 'No current offering.'; return null; }
+    if (!o.current.availablePackages?.length) { plusLoadNote = 'The offering has no packages.'; return null; }
+    return o.current;
+  } catch (e) {
+    plusLoadNote = `${e?.message || 'Unknown error'}${e?.code ? ` (code ${e.code})` : ''}`;
+    return null;
+  }
 }
 
-export async function buyPlus(pkg) {
-  const { customerInfo } = await Purchases.purchasePackage(pkg);
+/* Fallback: ask the App Store for the product directly. Works even if
+   the offering is misconfigured, and tells us if Apple isn't serving it. */
+export async function getPlusProduct() {
+  if (!purchasesAvailable()) return null;
+  try {
+    const list = await Purchases.getProducts([PRODUCT_ID]);
+    if (list?.length) return list[0];
+    plusLoadNote = `${plusLoadNote ? `${plusLoadNote} ` : ''}Apple returned no product for ${PRODUCT_ID}.`;
+    return null;
+  } catch (e) {
+    plusLoadNote = `${plusLoadNote ? `${plusLoadNote} ` : ''}${e?.message || 'Product lookup failed'}`;
+    return null;
+  }
+}
+
+/* item is either a RevenueCat package or a bare store product. */
+export async function buyPlus(item) {
+  const { customerInfo } = item?.product
+    ? await Purchases.purchasePackage(item)
+    : await Purchases.purchaseStoreProduct(item);
   return !!customerInfo.entitlements.active[PURCHASES.entitlement];
 }
 
