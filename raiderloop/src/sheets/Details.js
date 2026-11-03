@@ -9,15 +9,18 @@ import { useTheme } from '../theme/ThemeContext';
 import { useApp } from '../state/AppContext';
 import { api } from '../lib/firebase';
 import { useCallable } from '../lib/hooks';
-import { openUrl, openDirections, shareText } from '../lib/links';
+import { openUrl, openDirections } from '../lib/links';
+import { shareThing } from '../lib/share';
+import { addEventToCalendar } from '../lib/calendarExport';
 import { hoursByDay, isOpenNow, minutesUntilClose } from '../lib/hours';
 import { metaLine } from '../lib/time';
 import {
   buildingById, catLabel, walkLabel, floorPlanFor, ORGS, DINING, BUS_STOPS, RESOURCES, isGreek,
 } from '../data/campus';
-import { useHere } from '../lib/here';
-import { placeById } from '../data/places';
-import { CheckInCard, RatingSummary, AutoCheckInNote, DWELL_MIN } from './PlaceExtras';
+import { StatusTaps } from './Status';
+import { BuildingTips } from './Rooms';
+import LastChecked from '../ui/LastChecked';
+import { CHECKED } from '../config';
 
 function HoursTable({ spec }) {
   const { t } = useTheme();
@@ -42,18 +45,11 @@ export function OpenBadge({ spec }) {
 }
 
 /* ---------- Event ---------- */
-function eventLive(ev, now = Date.now()) {
-  const s = ev.startsAt ? Date.parse(ev.startsAt) : NaN;
-  return Number.isFinite(s) && now >= s - 30 * 60000 && now <= s + 3 * 3600000;
-}
-
 export function EventSheet({ ev, onClose }) {
-  useHere();
   const { t } = useTheme();
-  const { isSaved, toggleSave, addEventToSchedule, setSheet } = useApp();
+  const { isSaved, toggleSave, addEventToSchedule, setSheet, showToast } = useApp();
   const saved = isSaved(ev.id);
   const b = ev.buildingId ? buildingById(ev.buildingId) : null;
-  const live = eventLive(ev);
   return (
     <Sheet title={ev.title} hand={metaLine(ev.org, ev.date, ev.time)} onClose={onClose}
       footer={(
@@ -67,17 +63,12 @@ export function EventSheet({ ev, onClose }) {
         <PT kind="body">{ev.desc || 'No description was posted for this one.'}</PT>
         {ev.location || b ? <PT kind="small" style={{ marginTop: 8 }}>📍 {ev.location || b?.name}</PT> : null}
       </PostIt>
-      {live ? (
-        <PostIt color="green" seed={`live-${ev.id}`} style={{ marginTop: 14 }}>
-          <PT kind="bold">Happening now: +25 flight score for showing up</PT>
-          <AutoCheckInNote text={`Stay about ${DWELL_MIN} minutes and Flyer stamps you automatically.`} style={{ marginTop: 4 }} />
-        </PostIt>
-      ) : null}
       <View style={{ marginTop: 16 }}>
         {b ? <Row title="Walking directions" meta={metaLine(b.name, walkLabel(b))} left={<Icon name="walk" color={t.ink} />} onPress={() => openDirections(b)} /> : null}
-        <Row title="Send to a friend in Flyer" meta="As a card in a chat" left={<Icon name="chat" color={t.ink} />} onPress={() => setSheet({ type: 'shareCard', card: { type: 'event', title: ev.title, date: ev.date, time: ev.time, location: ev.location || b?.name || '', sourceUrl: ev.sourceUrl || null } })} />
         {ev.sourceUrl ? <Row title="Original listing" meta="Opens the source page" left={<Icon name="link" color={t.ink} />} onPress={() => openUrl(ev.sourceUrl)} /> : null}
-        <Row title="Send to a friend" left={<Icon name="share" color={t.ink} />} onPress={() => shareText(`${ev.title}: ${metaLine(ev.date, ev.time, ev.location || b?.name)} (via Flyer)`)} last />
+        {ev.startsAt ? <Row title="Add to my calendar" meta="Into your Flyer calendar, with a reminder" left={<Icon name="calendarPlus" color={t.ink} />} onPress={async () => { try { const r = await addEventToCalendar({ title: ev.title, startsAt: ev.startsAt, location: ev.location || b?.name || '', notes: ev.desc || '', url: ev.sourceUrl || '' }); showToast(r === 'already' ? "It's already on your calendar" : 'Added to your Flyer calendar'); } catch (e) { showToast(e.message); } }} /> : null}
+        <Row title="Ask friends to go" meta="A quick poll they can answer even without Flyer" left={<Icon name="users" color={t.ink} />} onPress={() => setSheet({ type: 'planNew', kind: 'poll', title: `${ev.title}?`, options: ["I'm in", 'Maybe', "Can't"] })} />
+        <Row title="Send to a friend" meta="A link with a preview card" left={<Icon name="share" color={t.ink} />} onPress={() => shareThing('event', { title: ev.title, when: metaLine(ev.date, ev.time), where: ev.location || b?.name || '', desc: ev.desc || '', url: ev.sourceUrl || '', img: ev.img || '', startsAt: ev.startsAt || '' })} last />
       </View>
       {!/today|tonight/i.test(ev.date || '') && ev.time ? <T kind="small" style={{ marginTop: 10 }}>"Add to today" only works on the day of the event.</T> : null}
     </Sheet>
@@ -112,7 +103,6 @@ export function OrgSheet({ id, onClose }) {
 
 /* ---------- Building ---------- */
 export function BuildingSheet({ id, onClose }) {
-  useHere();
   const { t } = useTheme();
   const { setSheet, scheduleItems } = useApp();
   const b = buildingById(id);
@@ -121,20 +111,12 @@ export function BuildingSheet({ id, onClose }) {
   const dining = DINING.filter((d) => d.buildingId === b.id);
   const stops = BUS_STOPS.filter((s) => s.buildingId === b.id);
   const resources = RESOURCES.filter((r) => r.buildingId === b.id);
-  const myClasses = scheduleItems.filter((c) => !c.oneOff && c.buildingId === b.id);
+  const myClasses = scheduleItems.filter((c) => c.buildingId === b.id);
   return (
     <Sheet title={b.name} hand={metaLine(catLabel(b.kind), walkLabel(b))} onClose={onClose}
       footer={<Button title="Walking directions" icon="walk" onPress={() => openDirections(b)} />}>
       <View style={{ flexDirection: 'row', marginBottom: 6 }}><OpenBadge spec={b.hours} /></View>
       {b.hours ? <HoursTable spec={b.hours} /> : <T kind="small">No posted hours for this building.</T>}
-
-      <CheckInCard placeId={b.id} />
-      {placeById(b.id) ? (
-        <View style={{ marginTop: 14 }}>
-          <T kind="tiny" style={{ marginBottom: 6 }}>{placeById(b.id).tier === 'dining' ? 'Food ratings' : 'Study ratings'}</T>
-          <RatingSummary placeId={b.id} />
-        </View>
-      ) : null}
 
       {myClasses.length ? (
         <PostIt color="yellow" seed={`${b.id}-mine`} style={{ marginTop: 16 }}>
@@ -144,20 +126,22 @@ export function BuildingSheet({ id, onClose }) {
       ) : null}
 
       <View style={{ marginTop: 16 }}>
-        <Row title={plan.label} meta={plan.howTo ? `Find "${b.name}", then ${plan.howTo}` : 'Official maps for every floor'} left={<Icon name="layers" color={t.ink} />} onPress={() => openUrl(plan.url)} />
+        <Row title="Find a room here" meta="Which floor it's probably on, the doors students use, elevator status" left={<Icon name="door" color={t.ink} />} chevron onPress={() => setSheet({ type: 'rooms', buildingId: b.id, query: b.name })} />
+        {plan ? <Row title={plan.label} meta="Official public floor maps" left={<Icon name="layers" color={t.ink} />} onPress={() => openUrl(plan.url)} /> : null}
         {dining.map((d) => <Row key={d.id} title={d.name} meta="Dining inside" left={<Icon name="food" color={t.ink} />} onPress={() => setSheet({ type: 'dining', id: d.id })} />)}
         {resources.map((r) => <Row key={r.id} title={r.name} meta={r.kind} left={<Icon name="help" color={t.ink} />} onPress={r.url ? () => openUrl(r.url) : undefined} />)}
         {stops.map((s) => <Row key={s.id} title={`Citibus stop: ${s.name}`} meta={`${s.route} route`} left={<Icon name="bus" color={t.ink} />} />)}
-        {placeById(b.id) ? <Row title="Plan a meetup here" meta="Send a friend a meetup card" left={<Icon name="users" color={t.ink} />} onPress={() => setSheet({ type: 'meetupNew', placeId: b.id })} /> : null}
-        <Row title="Send this place to a friend" left={<Icon name="chat" color={t.ink} />} onPress={() => setSheet({ type: 'shareCard', card: { type: 'place', placeId: b.id, name: b.name } })} last />
       </View>
+      <T kind="tiny" style={{ marginTop: 16, marginBottom: 6 }}>Right now</T>
+      <StatusTaps placeId={b.id} kinds={['elevator', 'printer', 'seats', 'wifi']} />
+      <BuildingTips buildingId={b.id} max={4} />
+      <LastChecked date={CHECKED.buildings} source="Hours from the building's TTU page" itemId={`building:${b.id}`} title={b.name} />
     </Sheet>
   );
 }
 
 /* ---------- Dining ---------- */
 export function DiningSheet({ id, onClose }) {
-  useHere();
   const d = DINING.find((x) => x.id === id);
   const detail = useCallable(api.getDiningHallDetail, { hallName: d?.venue }, null, { asArray: false, enabled: !!d && !d.concepts?.length });
   if (!d) return null;
@@ -175,6 +159,7 @@ export function DiningSheet({ id, onClose }) {
         </PostIt>
       ) : <T kind="small">Single-location spot, no separate stations listed.</T>}
       <T kind="small" style={{ marginTop: 10 }}>Hours from TTU Hospitality Services. Holidays and breaks can change them.</T>
+      <LastChecked date={CHECKED.dining} source="TTU Hospitality Services" itemId={`dining:${d.id}`} title={d.name} />
     </Sheet>
   );
 }

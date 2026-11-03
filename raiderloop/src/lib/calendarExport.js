@@ -11,6 +11,7 @@ import { toMinutes, DAY_TO_JS } from './time';
 import { TERM } from '../config';
 
 const CAL_TITLE = 'Flyer';
+const SAVED_TAG = 'Saved from Flyer';
 
 async function getFlyerCalendarId() {
   const cals = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
@@ -45,7 +46,8 @@ export async function exportToCalendar({ scheduleItems, assignments }) {
   const from = new Date(); from.setMonth(from.getMonth() - 6);
   const to = new Date(`${TERM.finalsEnd}T23:59:00`); to.setMonth(to.getMonth() + 1);
   const old = await Calendar.getEventsAsync([calId], from, to).catch(() => []);
-  for (const e of old) await Calendar.deleteEventAsync(e.id, { futureEvents: true }).catch(() => {});
+  // Single events you saved from a link or plan stay put.
+  for (const e of old.filter((x) => !String(x.notes || '').includes(SAVED_TAG))) await Calendar.deleteEventAsync(e.id, { futureEvents: true }).catch(() => {});
 
   const termStart = new Date(Math.max(Date.now(), new Date(`${TERM.firstDay}T00:00:00`).getTime()));
   const termEnd = new Date(`${TERM.lastDay}T23:59:00`);
@@ -77,4 +79,22 @@ export async function exportToCalendar({ scheduleItems, assignments }) {
     count++;
   }
   return count;
+}
+
+/** One event (a shared link, a plan that got picked) into the Flyer calendar. */
+export async function addEventToCalendar({ title, startsAt, endsAt, location = '', notes = '', url = '' }) {
+  if (!Calendar) throw new Error("Calendar isn't available in this build.");
+  const start = new Date(startsAt);
+  if (Number.isNaN(start.getTime())) throw new Error("That doesn't have a date Flyer can read.");
+  const { status } = await Calendar.requestCalendarPermissionsAsync();
+  if (status !== 'granted') throw new Error('Calendar access is off for Flyer. You can turn it on in Settings.');
+  const calId = await getFlyerCalendarId();
+  const end = endsAt ? new Date(endsAt) : new Date(start.getTime() + 60 * 60000);
+  const same = await Calendar.getEventsAsync([calId], new Date(start.getTime() - 60000), new Date(start.getTime() + 60000)).catch(() => []);
+  if (same.some((e) => e.title === title)) return 'already';
+  await Calendar.createEventAsync(calId, {
+    title, location, startDate: start, endDate: end, timeZone: 'America/Chicago',
+    notes: [notes, url, SAVED_TAG].filter(Boolean).join('\n'), alarms: [{ relativeOffset: -30 }],
+  });
+  return 'added';
 }

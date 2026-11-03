@@ -38,13 +38,59 @@ export function T({ children, style, kind = 'body', color, numberOfLines, onPres
   );
 }
 
-/* ---------- Notebook page background ---------- */
-export function NotebookBg({ lines = true, margin = true, style }) {
+/* ---------- Notebook page background ----------
+   kind: 'lined' (the classic notebook), 'graph' (tools, math),
+   'dots' (group work), or 'plain'. */
+function GraphLines({ t }) {
+  const step = 22;
+  const cols = Math.ceil(SCREEN_W / step) + 1;
+  const rows = Math.ceil(SCREEN_H / step) + 1;
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, i) => <View key={`r${i}`} style={{ position: 'absolute', left: 0, right: 0, top: i * step, height: 1, backgroundColor: t.rule, opacity: 0.75 }} />)}
+      {Array.from({ length: cols }).map((_, i) => <View key={`c${i}`} style={{ position: 'absolute', top: 0, bottom: 0, left: i * step, width: 1, backgroundColor: t.rule, opacity: 0.75 }} />)}
+    </>
+  );
+}
+function DotGrid({ t }) {
+  if (!SvgLib) return null;
+  const { default: Svg, Defs, Pattern, Circle, Rect } = SvgLib;
+  return (
+    <Svg width={SCREEN_W} height={SCREEN_H} style={{ position: 'absolute', left: 0, top: 0 }}>
+      <Defs>
+        <Pattern id="flyerDots" x="0" y="0" width="18" height="18" patternUnits="userSpaceOnUse">
+          <Circle cx="9" cy="9" r="1.3" fill={t.faint} />
+        </Pattern>
+      </Defs>
+      <Rect x="0" y="0" width={SCREEN_W} height={SCREEN_H} fill="url(#flyerDots)" />
+    </Svg>
+  );
+}
+
+/* Kraft paper: little fibers scattered the same way every time. */
+const FIBERS = Array.from({ length: 70 }, (_, i) => {
+  const r = (n) => { const x = Math.sin(i * 97.13 + n * 13.7) * 10000; return x - Math.floor(x); };
+  return { x: r(1), y: r(2), w: 6 + r(3) * 14, a: (r(4) - 0.5) * 140, o: 0.06 + r(5) * 0.08 };
+});
+function KraftFibers({ t }) {
+  return (
+    <View style={StyleSheet.absoluteFill}>
+      {FIBERS.map((f, i) => (
+        <View key={i} style={{ position: 'absolute', left: `${f.x * 100}%`, top: `${f.y * 100}%`, width: f.w, height: 1.5, borderRadius: 1, backgroundColor: t.mode === 'dark' ? '#FFFFFF' : '#6B4E2A', opacity: f.o, transform: [{ rotate: `${f.a}deg` }] }} />
+      ))}
+    </View>
+  );
+}
+
+export function NotebookBg({ lines = true, margin = true, kind = 'lined', style }) {
   const { t } = useTheme();
   const count = Math.ceil(SCREEN_H / 30) + 2;
   return (
-    <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: t.paper }, style]}>
-      {lines ? Array.from({ length: count }).map((_, i) => (
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: kind === 'kraft' ? (t.kraft || t.paper) : t.paper }, style]}>
+      {kind === 'kraft' ? <KraftFibers t={t} /> : null}
+      {kind === 'graph' ? <GraphLines t={t} /> : null}
+      {kind === 'dots' ? <DotGrid t={t} /> : null}
+      {kind === 'lined' && lines ? Array.from({ length: count }).map((_, i) => (
         <View key={i} style={{ position: 'absolute', left: 0, right: 0, top: 96 + i * 30, height: 1, backgroundColor: t.rule }} />
       )) : null}
       {margin ? <View style={{ position: 'absolute', top: 0, bottom: 0, left: 30, width: 1.5, backgroundColor: t.margin }} /> : null}
@@ -298,13 +344,10 @@ export function Sheet({ visible = true, onClose, title, hand, children, height =
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        {/* The gap at the top keeps the sheet clear of the clock and
-            Dynamic Island. Everything below can shrink, so when the
-            keyboard opens the sheet fits above it instead of sliding under. */}
-        <Pressable style={{ flex: 1, minHeight: Platform.OS === 'ios' ? 56 : 24, backgroundColor: 'rgba(20,24,36,0.42)' }} onPress={onClose} accessibilityLabel="Close" />
-        <Animated.View style={{ maxHeight: SCREEN_H * height, flexShrink: 1, transform: [{ translateY: y }] }}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(20,24,36,0.42)' }} onPress={onClose} accessibilityLabel="Close" />
+        <Animated.View style={{ maxHeight: SCREEN_H * height, transform: [{ translateY: y }] }}>
           <TornEdge color={t.paper} />
-          <View style={{ backgroundColor: t.paper, paddingBottom: 30, flexShrink: 1 }}>
+          <View style={{ backgroundColor: t.paper, paddingBottom: 30 }}>
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: PAD, paddingTop: 6 }}>
               <View style={{ flex: 1 }}>
                 {title ? <T kind="handBig">{title}</T> : null}
@@ -314,12 +357,12 @@ export function Sheet({ visible = true, onClose, title, hand, children, height =
               <IconButton name="close" onPress={onClose} size={18} label="Close" style={{ width: 36, height: 36, marginLeft: 8 }} />
             </View>
             <Body
-              style={scroll ? { maxHeight: SCREEN_H * height - 120, flexShrink: 1 } : { flexShrink: 1 }}
+              style={scroll ? { maxHeight: SCREEN_H * height - 120 } : null}
               contentContainerStyle={scroll ? { paddingHorizontal: PAD, paddingTop: 10, paddingBottom: 16 } : null}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
-              {scroll ? children : <View style={{ paddingHorizontal: PAD, paddingTop: 10, flexShrink: 1 }}>{children}</View>}
+              {scroll ? children : <View style={{ paddingHorizontal: PAD, paddingTop: 10 }}>{children}</View>}
             </Body>
             {footer ? <View style={{ paddingHorizontal: PAD, paddingTop: 8 }}>{footer}</View> : null}
           </View>

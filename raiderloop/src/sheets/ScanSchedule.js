@@ -77,7 +77,7 @@ export default function ScanSchedule({ onConfirm, compact }) {
       const res = await api.parseSchedule({ imageBase64: asset.base64, mediaType });
       const classes = res?.data?.classes || [];
       setBusy(false);
-      if (!classes.length) { setError("Couldn't find any classes. Try a clearer, full-screen screenshot."); return; }
+      if (!classes.length) { setError("Couldn't find any classes in that image. Try a clearer, full-screen screenshot."); return; }
       setRaw(classes);
     } catch (e) {
       setBusy(false);

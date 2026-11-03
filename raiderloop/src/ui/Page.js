@@ -8,41 +8,48 @@ import { View, ScrollView, SafeAreaView, Platform, RefreshControl, Animated, Pre
 import { useTheme } from '../theme/ThemeContext';
 import { PAD } from '../theme/tokens';
 import { NotebookBg, T, Scribble } from './Paper';
+import { SeasonDecor, PlaneOutfit } from './Scrap';
 import Icon from './Icon';
 import { PlaneMark } from './Logo';
 import { tap } from '../lib/native';
+import { FadeIn } from './Kit';
 
 export const BOTTOM_SPACE = 150;
 
-export function Page({ title, eyebrow, right, children, refreshing, onRefresh, scroll = true, margin = true }) {
+/* paper: 'lined' (default) | 'graph' | 'dots' | 'kraft' | 'plain' */
+export function Page({ title, eyebrow, right, children, refreshing, onRefresh, scroll = true, margin = true, paper = 'lined' }) {
   const { t } = useTheme();
+  const showMargin = margin && paper === 'lined';
   const header = (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginBottom: 6 }}>
-      <View style={{ flex: 1 }}>
-        {eyebrow ? <T kind="hand" color={t.pencil}>{eyebrow}</T> : null}
-        <T kind="marker" style={{ fontSize: title.length > 16 ? 28 : 34, lineHeight: title.length > 16 ? 34 : 40 }} numberOfLines={2}>{title}</T>
-        <Scribble width={Math.min(200, 30 + title.length * 15)} style={{ marginTop: -8 }} />
+    <View>
+      <SeasonDecor />
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginBottom: 6 }}>
+        <View style={{ flex: 1 }}>
+          {eyebrow ? <T kind="hand" color={t.pencil}>{eyebrow}</T> : null}
+          <T kind="marker" style={{ fontSize: title.length > 16 ? 28 : 34, lineHeight: title.length > 16 ? 34 : 40 }} numberOfLines={2}>{title}</T>
+          <Scribble width={Math.min(200, 30 + title.length * 15)} style={{ marginTop: -8 }} />
+        </View>
+        {right}
       </View>
-      {right}
     </View>
   );
   return (
     <View style={{ flex: 1, backgroundColor: t.paper }}>
-      <NotebookBg margin={margin} />
+      <NotebookBg margin={showMargin} kind={paper} />
       <SafeAreaView style={{ flex: 1 }}>
         {scroll ? (
           <ScrollView
-            contentContainerStyle={{ paddingLeft: margin ? PAD + 22 : PAD, paddingRight: PAD, paddingTop: Platform.OS === 'android' ? 40 : 12, paddingBottom: BOTTOM_SPACE }}
+            contentContainerStyle={{ paddingLeft: showMargin ? PAD + 22 : PAD, paddingRight: PAD, paddingTop: Platform.OS === 'android' ? 40 : 12, paddingBottom: BOTTOM_SPACE }}
             showsVerticalScrollIndicator={false}
             refreshControl={onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={t.accent} /> : undefined}
             keyboardShouldPersistTaps="handled"
           >
             {header}
-            {children}
+            <FadeIn>{children}</FadeIn>
           </ScrollView>
         ) : (
           <View style={{ flex: 1, paddingTop: Platform.OS === 'android' ? 40 : 12 }}>
-            <View style={{ paddingLeft: margin ? PAD + 22 : PAD, paddingRight: PAD }}>{header}</View>
+            <View style={{ paddingLeft: showMargin ? PAD + 22 : PAD, paddingRight: PAD }}>{header}</View>
             {children}
           </View>
         )}
@@ -79,7 +86,8 @@ export function TabBar({ tab, setTab, badges = {} }) {
   );
 }
 
-/* Floating Pilot button — a paper airplane that bobs gently. */
+/* Floating Pilot button: a paper airplane that bobs gently, wearing
+   whatever the season calls for. */
 export function PilotFab({ onPress }) {
   const { t } = useTheme();
   const bob = React.useRef(new Animated.Value(0)).current;
@@ -97,6 +105,7 @@ export function PilotFab({ onPress }) {
         style={({ pressed }) => ({ width: 62, height: 62, borderRadius: 31, backgroundColor: t.highlight, borderWidth: 2.5, borderColor: '#1F2A44', alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.85 : 1, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 8 })}>
         <PlaneMark size={40} trail={false} color="#1F2A44" />
       </Pressable>
+      <PlaneOutfit size={26} style={{ top: -10, right: -4, transform: [{ rotate: '18deg' }] }} />
     </Animated.View>
   );
 }

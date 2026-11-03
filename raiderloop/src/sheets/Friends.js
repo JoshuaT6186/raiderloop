@@ -1,24 +1,22 @@
 /**
- * Friends: list, requests, and location sharing.
+ * Friends: list, requests, classmates (opt-in), and location sharing.
  * See lib/location.js for the safety rules sharing follows.
  */
-import React, { useEffect, useState } from 'react';
-import { View, Pressable } from 'react-native';
+import React, { useState } from 'react';
+import { View, Pressable, Alert } from 'react-native';
 import { Sheet, T, PostIt, PT, Card, Button, Row, Chip, Field, Toggle, Empty, Divider } from '../ui/Paper';
 import Icon from '../ui/Icon';
 import Avatar from '../ui/Avatar';
 import { useTheme } from '../theme/ThemeContext';
 import { useApp } from '../state/AppContext';
-import { api, errText } from '../lib/firebase';
-import { parseFriendCode, redeemCode, inviteToFlyer } from './QrFriend';
-import { ShareLevelPicker } from './FriendProfile';
-import { startNearby, nearbyAvailable } from '../lib/nearby';
+import { api } from '../lib/firebase';
 import { shareText } from '../lib/links';
 import { sharingActive, expiryFor, goGhost, getForegroundPermission, lastSeenLabel } from '../lib/location';
 
 const TABS = [
   { id: 'friends', label: 'Friends', icon: 'users' },
   { id: 'requests', label: 'Requests', icon: 'userPlus' },
+  { id: 'classmates', label: 'Classmates', icon: 'cap' },
   { id: 'sharing', label: 'Sharing', icon: 'location' },
 ];
 
@@ -33,126 +31,44 @@ function NeedsAccount() {
   );
 }
 
-const CODE_RE = /^[A-HJ-NP-Z2-9]{8}$/i;
-const STATUS_LABEL = { friend: 'Friends', requested: 'Requested', incoming: 'Wants to add you' };
-
-/* Search by first name or @username. Tapping a result opens a confirm
-   card (big avatar, name, username, mutual friends) so you can check
-   it's really them before anything is sent. */
-function FindPeople() {
-  const { t } = useTheme();
-  const { showToast } = useApp();
-  const [q, setQ] = useState('');
-  const [results, setResults] = useState(null); // null = not searched yet
-  const [resultsFor, setResultsFor] = useState('');
-  const [searching, setSearching] = useState(false);
-  const [picked, setPicked] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const raw = q.trim();
-  const typedCode = !raw.startsWith('@') && CODE_RE.test(raw.replace(/[-\s]/g, '')) ? parseFriendCode(raw.replace(/[-\s]/g, '')) : null;
-  // An 8-letter name like "maryanne" also fits the code pattern, so only
-  // offer it as a code if it has a digit or nobody by that name turned up.
-  const code = typedCode && (/\d/.test(typedCode) || (results && !results.length && resultsFor === raw)) ? typedCode : null;
-
-  useEffect(() => {
-    setPicked(null);
-    if (raw.replace(/^@/, '').length < 3) { setResults(null); setSearching(false); return undefined; }
-    let live = true;
-    const id = setTimeout(async () => {
-      setSearching(true);
-      try { const r = await api.searchPeople({ q: raw }); if (live) { setResults(r.data.results || []); setResultsFor(raw); } } catch (e) { if (live) { setResults([]); setResultsFor(raw); showToast(errText(e, "Couldn't search right now")); } }
-      if (live) setSearching(false);
-    }, 450);
-    return () => { live = false; clearTimeout(id); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [raw]);
-
-  const redeemTyped = async () => {
-    setBusy(true);
-    if (await redeemCode(code, showToast)) setQ('');
-    setBusy(false);
-  };
-  const send = async (p) => {
-    setBusy(true);
-    try {
-      const r = await api.sendFriendRequest({ uid: p.uid });
-      showToast(r.data?.accepted ? `You and ${(p.name || 'them').split(' ')[0]} are friends!` : 'Request sent');
-      setResults((list) => (list || []).map((x) => (x.uid === p.uid ? { ...x, status: r.data?.accepted ? 'friend' : 'requested' } : x)));
-      setPicked(null);
-    } catch (e) { showToast(errText(e, "Couldn't send that request")); }
-    setBusy(false);
-  };
-  const mutualText = (n) => (n ? `${n} mutual ${n === 1 ? 'friend' : 'friends'}` : 'No mutual friends yet');
-
-  return (
-    <View>
-      <Field placeholder="Search a name or @username" value={q} onChangeText={setQ} autoCapitalize="none" autoCorrect={false} returnKeyType="search" style={{ marginBottom: 8 }} />
-      {code ? <Row title={`Use invite code ${code}`} meta="Adds you as friends right away" left={<Icon name="qr" color={t.ink} />} onPress={busy ? undefined : redeemTyped} last /> : null}
-
-      {picked ? (
-        <PostIt color="yellow" tilt={-0.6} tape padding={18} style={{ marginVertical: 8 }}>
-          <View style={{ alignItems: 'center' }}>
-            <Avatar config={picked.avatar} size={84} />
-            <PT kind="title" style={{ marginTop: 8 }}>{picked.name || `@${picked.handle}`}</PT>
-            <PT kind="bold">@{picked.handle}</PT>
-            <PT kind="small" style={{ marginTop: 2 }}>{mutualText(picked.mutual)}</PT>
-          </View>
-          <PT kind="small" style={{ marginTop: 10, textAlign: 'center' }}>Is this them? If you're not sure, ask for their username or scan their QR code.</PT>
-          {picked.status === 'none' || picked.status === 'incoming' ? (
-            <View style={{ flexDirection: 'row', marginTop: 12 }}>
-              <Button title="Not them" kind="ghost" small onPress={() => setPicked(null)} style={{ flex: 1, marginRight: 8, backgroundColor: '#fff' }} />
-              <Button title={picked.status === 'incoming' ? 'Accept' : 'Send request'} icon="userPlus" small loading={busy} onPress={() => send(picked)} style={{ flex: 1 }} />
-            </View>
-          ) : (
-            <Button title={picked.status === 'friend' ? "You're already friends" : 'Request already sent'} kind="ghost" small onPress={() => setPicked(null)} style={{ marginTop: 12, backgroundColor: '#fff' }} />
-          )}
-        </PostIt>
-      ) : null}
-
-      {!picked && searching && !results ? <T kind="small" color={t.pencil}>Searching…</T> : null}
-      {!picked && results && results.length ? results.map((p, i) => (
-        <Row key={p.uid} title={p.name || `@${p.handle}`} meta={`@${p.handle} · ${mutualText(p.mutual)}`}
-          left={<Avatar config={p.avatar} size={42} />} last={i === results.length - 1} onPress={() => setPicked(p)}
-          right={STATUS_LABEL[p.status] ? <T kind="small" color={t.pencil}>{STATUS_LABEL[p.status]}</T> : null} />
-      )) : null}
-      {!picked && results && !results.length && !searching && !code ? (
-        <T kind="small" style={{ marginVertical: 6 }}>No one found for "{resultsFor}". Check the spelling, or invite them to Flyer below.</T>
-      ) : null}
-    </View>
-  );
-}
-
 function FriendsTab() {
   const { t } = useTheme();
-  const { friends, profile, friendLocations, showToast, setSheet, unreadChats } = useApp();
+  const { friends, profile, friendLocations, showToast } = useApp();
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const add = async () => {
+    setBusy(true);
+    try { await api.sendFriendRequest({ handle: code.trim().replace(/^@/, '') }); showToast('Request sent'); setCode(''); } catch (e) { showToast(e.message || "Couldn't send that request"); }
+    setBusy(false);
+  };
+  const manage = (f) => Alert.alert(f.name || 'Friend', undefined, [
+    { text: 'Remove friend', style: 'destructive', onPress: () => api.removeFriend({ uid: f.uid }).then(() => showToast('Removed')).catch(() => {}) },
+    { text: 'Block', style: 'destructive', onPress: () => api.blockUser({ uid: f.uid }).then(() => showToast('Blocked. They can\'t find or add you')).catch(() => {}) },
+    { text: 'Cancel', style: 'cancel' },
+  ]);
   return (
     <View>
-      <View style={{ flexDirection: 'row', marginBottom: 14 }}>
-        <Button title="My QR code" icon="qr" small onPress={() => setSheet({ type: 'qr', tab: 'mine' })} style={{ flex: 1, marginRight: 8 }} />
-        <Button title="Scan a code" icon="scan" small kind="ghost" onPress={() => setSheet({ type: 'qr', tab: 'scan' })} style={{ flex: 1 }} />
-      </View>
-      <Row title="Messages" meta={unreadChats ? `${unreadChats} unread` : 'Friends and flocks'} left={<Icon name="chat" color={t.ink} />} onPress={() => setSheet({ type: 'chats' })} />
-      <T kind="tiny" style={{ marginTop: 16, marginBottom: 6 }}>Add a friend</T>
-      <FindPeople />
-      <Row title="Invite someone to Flyer" meta="Not on Flyer yet? Send a link. You'll be friends once they sign up." left={<Icon name="share" color={t.ink} />} onPress={() => inviteToFlyer(showToast)} last />
       {profile?.handle ? (
-        <Card style={{ marginVertical: 14 }}>
-          <T kind="tiny">Your username. Friends can search for it</T>
-          <T kind="title" style={{ marginTop: 4 }} selectable>@{profile.handle}</T>
-          <View style={{ flexDirection: 'row', marginTop: 10 }}>
-            <Button title="Change" icon="pencil" small kind="ghost" onPress={() => setSheet({ type: 'handle', back: { type: 'friends' } })} style={{ flex: 1, marginRight: 8 }} />
-            <Button title="Share" icon="share" small kind="ghost" onPress={() => shareText(`Add me on Flyer! My username is @${profile.handle}`)} style={{ flex: 1 }} />
+        <Card style={{ marginBottom: 14 }}>
+          <T kind="tiny">Your friend code</T>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+            <T kind="marker" style={{ fontSize: 26, flex: 1 }}>@{profile.handle}</T>
+            <Button title="Share" icon="share" small kind="ghost" onPress={() => shareText(`Add me on Flyer! My friend code is @${profile.handle}`)} />
           </View>
         </Card>
       ) : null}
-      <T kind="tiny" style={{ marginTop: 6, marginBottom: 6 }}>Your friends</T>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+        <Field placeholder="Friend's code, e.g. @josh26" value={code} onChangeText={setCode} autoCapitalize="none" style={{ flex: 1, marginRight: 8 }} />
+        <Button title="Add" small loading={busy} disabled={code.trim().length < 3} onPress={add} style={{ marginTop: 2 }} />
+      </View>
       {friends.length ? friends.map((f, i) => {
         const loc = friendLocations.find((l) => l.uid === f.uid);
         return (
           <Row key={f.uid} title={f.name || f.handle} meta={loc ? `Sharing location with you · ${lastSeenLabel(loc.updatedAt)}` : `@${f.handle}`}
-            left={<Avatar config={f.avatar} size={42} />} last={i === friends.length - 1} onPress={() => setSheet({ type: 'friend', uid: f.uid })} />
+            left={<Avatar config={f.avatar} size={42} />} last={i === friends.length - 1}
+            right={<Pressable onPress={() => manage(f)} hitSlop={10} accessibilityLabel={`Manage ${f.name}`}><Icon name="gear" size={18} color={t.faint} /></Pressable>} />
         );
-      }) : <Empty icon="users" title="No friends yet" body="Search for someone above, show your QR code, or invite them to Flyer." />}
+      }) : <Empty icon="users" title="No friends yet" body="Share your code, or add someone with theirs." />}
     </View>
   );
 }
@@ -177,18 +93,69 @@ function RequestsTab() {
   );
 }
 
+function ClassmatesTab() {
+  const { classmatesOptIn, set, scheduleItems, showToast, friends } = useApp();
+  const [results, setResults] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const courses = [...new Set(scheduleItems.filter((c) => !c.oneOff).map((c) => c.title))];
+  const toggle = async (v) => {
+    set({ classmatesOptIn: v });
+    try { await api.setClassmateOptIn({ optIn: v, courses: v ? courses : [] }); } catch (e) { showToast(e.message); }
+    if (!v) setResults(null);
+  };
+  const search = async () => {
+    setBusy(true);
+    try { const r = await api.findClassmates({ courses }); setResults(r.data?.matches || []); } catch (e) { showToast(e.message); }
+    setBusy(false);
+  };
+  return (
+    <View>
+      <Card>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View style={{ flex: 1 }}>
+            <T kind="bold">Find classmates</T>
+            <T kind="small">Show your course codes (not times or rooms) to other Flyer users who also opt in, so you can find study partners.</T>
+          </View>
+          <Toggle value={classmatesOptIn} onChange={toggle} label="Find classmates" />
+        </View>
+      </Card>
+      {classmatesOptIn ? (
+        <View style={{ marginTop: 14 }}>
+          <Button title="Look for classmates" icon="search" small loading={busy} disabled={!courses.length} onPress={search} />
+          {!courses.length ? <T kind="small" style={{ marginTop: 6 }}>Add classes in the Planner first.</T> : null}
+          {results ? (results.length ? results.map((m) => (
+            <PostIt key={m.course} color="blue" seed={m.course} style={{ marginTop: 14 }}>
+              <PT kind="title">{m.course}</PT>
+              <PT kind="small">{m.count} other {m.count === 1 ? 'student' : 'students'} on Flyer</PT>
+              {(m.people || []).map((p) => (
+                <View key={p.uid} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+                  <Avatar config={p.avatar} size={34} />
+                  <PT kind="bold" style={{ flex: 1, marginLeft: 8 }}>{p.name}</PT>
+                  {friends.some((f) => f.uid === p.uid) ? <PT kind="small">friends</PT> : (
+                    <Button title="Add" small kind="ghost" onPress={() => api.sendFriendRequest({ uid: p.uid }).then(() => showToast('Request sent')).catch((e) => showToast(e.message))} />
+                  )}
+                </View>
+              ))}
+            </PostIt>
+          )) : <Empty icon="cap" title="No classmates on Flyer yet" body="Invite friends from your classes. The more people opt in, the more this finds." />) : null}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 function SharingTab() {
   const { sharing, set, friends, showToast } = useApp();
   const active = sharingActive(sharing);
   const update = (patch) => set((p) => ({ sharing: { ...p.sharing, ...patch } }));
   const toggleFriend = (uid) => update({ allowed: sharing.allowed.includes(uid) ? sharing.allowed.filter((x) => x !== uid) : [...sharing.allowed, uid] });
   const start = async (opt) => {
-    if (!(await getForegroundPermission(true))) { showToast('Turn on location for Flyer in Settings to share.'); return; }
+    if (!(await getForegroundPermission(true))) { showToast('Location is off for Flyer. Turn it on in Settings to share.'); return; }
     if (!sharing.allowed.length) { showToast('Pick at least one friend first.'); return; }
     update({ on: true, until: expiryFor(opt) });
     showToast('Sharing while Flyer is open');
   };
-  const ghost = async () => { update({ on: false, until: null }); await goGhost(); showToast('Ghost mode on. Your location was removed.'); };
+  const ghost = async () => { update({ on: false, until: null }); await goGhost(); showToast('Ghost mode: your location was removed'); };
 
   return (
     <View>
@@ -224,60 +191,7 @@ function SharingTab() {
           </View>
         </>
       ) : null}
-      <T kind="small" style={{ marginTop: 10 }}>Live location is only sent while Flyer is open on your screen.</T>
-      <ScheduleSharing />
-      <NearbyAlerts />
-    </View>
-  );
-}
-
-function ScheduleSharing() {
-  const { friends, scheduleShare } = useApp();
-  const n = Object.keys(scheduleShare.levels).filter((k) => friends.some((f) => f.uid === k)).length;
-  return (
-    <View>
-      <Divider />
-      <T kind="title">Schedule sharing</T>
-      <T kind="small" style={{ marginBottom: 6 }}>{n ? `Shared with ${n} ${n === 1 ? 'friend' : 'friends'}.` : 'Off for everyone.'} Free / busy shows only when you're in class. No class names or rooms.</T>
-      {friends.map((f, i) => (
-        <View key={f.uid} style={{ paddingVertical: 8, borderBottomWidth: i === friends.length - 1 ? 0 : 1, borderColor: 'rgba(31,42,68,0.12)', borderStyle: 'dashed' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}><Avatar config={f.avatar} size={28} /><T kind="bold" style={{ marginLeft: 8 }}>{f.name}</T></View>
-          <ShareLevelPicker uid={f.uid} />
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function NearbyAlerts() {
-  const { t } = useTheme();
-  const { nearby, set, friends, showToast } = useApp();
-  const [busy, setBusy] = useState(false);
-  const toggleOn = async (v) => {
-    setBusy(true);
-    if (v) {
-      const r = await startNearby();
-      if (!r.ok) { showToast(r.message); setBusy(false); return; }
-      set((p) => ({ nearby: { ...p.nearby, on: true } }));
-      showToast('Nearby alerts on. Pick friends below.');
-    } else {
-      set((p) => ({ nearby: { ...p.nearby, on: false } }));
-    }
-    setBusy(false);
-  };
-  const toggleFriend = (uid) => set((p) => ({ nearby: { ...p.nearby, allow: p.nearby.allow.includes(uid) ? p.nearby.allow.filter((x) => x !== uid) : [...p.nearby.allow, uid] } }));
-  return (
-    <View>
-      <Divider />
-      <Row title="Nearby alerts" meta="Get a heads-up when a friend is close by on campus" right={<Toggle value={nearby.on} onChange={busy ? () => {} : toggleOn} label="Nearby alerts" />} last />
-      {!nearbyAvailable() ? <T kind="small">Nearby alerts need the full app build.</T> : null}
-      {nearby.on ? friends.map((f, i) => (
-        <Row key={f.uid} title={f.name || f.handle} left={<Avatar config={f.avatar} size={32} />} last={i === friends.length - 1}
-          right={<Toggle value={nearby.allow.includes(f.uid)} onChange={() => toggleFriend(f.uid)} label={`Nearby alerts with ${f.name}`} />} />
-      )) : null}
-      <T kind="small" color={t.pencil} style={{ marginTop: 6 }}>
-        Both of you have to pick each other. Nobody sees where you are, just "Maya is nearby". Campus only, never 11 PM–7 AM, at most once every 3 hours per friend. Like automatic check-ins, this uses location in the background, so iOS will ask for "Always" access.
-      </T>
+      <T kind="small" style={{ marginTop: 10 }}>Location is only sent while Flyer is open on your screen, never in the background.</T>
     </View>
   );
 }
@@ -301,6 +215,7 @@ export default function FriendsSheet({ initialTab, onClose }) {
         <>
           {tab === 'friends' ? <FriendsTab /> : null}
           {tab === 'requests' ? <RequestsTab /> : null}
+          {tab === 'classmates' ? <ClassmatesTab /> : null}
           {tab === 'sharing' ? <SharingTab /> : null}
         </>
       )}

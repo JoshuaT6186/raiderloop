@@ -11,11 +11,11 @@ import { useApp } from '../state/AppContext';
 import { FOOTBALL_SCHEDULE, gameDateLabel, buildingById, RESOURCES } from '../data/campus';
 import { openUrl, openDirections } from '../lib/links';
 import { expiryFor, getForegroundPermission, sharingActive } from '../lib/location';
-import { emailSignUp, appleSignIn, getMyProfile, nameProblem } from '../lib/firebase';
-import { DEFAULT_AVATAR } from '../ui/avatarParts';
+import { emailSignUp, appleSignIn, appleErrorMessage, logClientError } from '../lib/firebase';
+import { useAppleAvailable, AppleButton } from '../screens/onboarding/Account';
 import { AppleAuth, Crypto } from '../lib/native';
-import { getPlusOffering, getPlusProduct, buyPlus, restorePlus, purchasesAvailable } from '../lib/monetize';
-import { APP, LIMITS, PURCHASES } from '../config';
+import { getPlusOffering, buyPlus, restorePlus, purchasesAvailable } from '../lib/monetize';
+import { LIMITS, PURCHASES } from '../config';
 
 /* ---------- Gameday ---------- */
 export function GamedaySheet({ kickoff, onClose }) {
@@ -67,60 +67,31 @@ export function GamedaySheet({ kickoff, onClose }) {
 /* ---------- Flyer Plus ---------- */
 export function PlusSheet({ onClose }) {
   const { t } = useTheme();
-  const { set, showToast, user, setSheet } = useApp();
+  const { set, showToast } = useApp();
   const [offering, setOffering] = useState(undefined);
   const [busy, setBusy] = useState(false);
-  const [direct, setDirect] = useState(null);
-  useEffect(() => {
-    (async () => {
-      const o = await getPlusOffering();
-      if (!o) setDirect(await getPlusProduct());
-      setOffering(o);
-    })();
-  }, []);
-  const pkg = offering?.monthly || offering?.availablePackages?.[0] || direct;
-  const hasAccount = !!user && !user.isAnonymous;
-  const price = pkg ? `${(pkg.product || pkg).priceString}/month` : PURCHASES.priceHint.replace('/mo', '/month');
+  useEffect(() => { getPlusOffering().then(setOffering); }, []);
+  const pkg = offering?.monthly || offering?.availablePackages?.[0];
   const perks = [
     ['tag', 'No ads, anywhere'],
     ['plane', `${LIMITS.pilotPlus} Pilot questions a day (instead of ${LIMITS.pilotFree})`],
     ['star', 'Extra avatar gear: grad cap, jersey'],
     ['heart', 'Keeps a student-built app running'],
   ];
-  const buy = async () => {
-    setBusy(true);
-    try { if (await buyPlus(pkg)) { set({ isPlus: true }); showToast('Welcome to Plus!'); onClose(); } } catch (e) { if (!e.userCancelled) showToast(e.message); }
-    setBusy(false);
-  };
-  const restore = async () => {
-    try { const ok = await restorePlus(); set({ isPlus: ok }); showToast(ok ? 'Plus restored' : 'No purchase found'); } catch (e) { showToast(e.message); }
-  };
   return (
     <Sheet title="Flyer Plus" hand="Everything stays free. Plus is a thank-you with perks." onClose={onClose}
       footer={(
         <View>
-          {!purchasesAvailable() ? <T kind="small" style={{ marginBottom: 8 }}>Flyer Plus isn't available yet. Check back soon.</T> : null}          {hasAccount ? (
-            <Button title={pkg ? `Get Plus · ${price}` : 'Get Plus'} icon="crown" kind="highlight" loading={busy || (purchasesAvailable() && offering === undefined)} disabled={!pkg} onPress={buy} />
-          ) : (
-            <>
-              <T kind="small" style={{ marginBottom: 8 }}>Plus is tied to your account so it follows you to a new phone. Make a free account first.</T>
-              <Button title="Make a free account" icon="userPlus" kind="highlight" onPress={() => { onClose(); setSheet({ type: 'account' }); }} />
-            </>
-          )}
-          <Pressable onPress={restore} accessibilityRole="button" style={{ alignItems: 'center', marginTop: 12 }}>
+          {!purchasesAvailable() ? <T kind="small" style={{ marginBottom: 8 }}>Purchases aren't set up in this build yet.</T> : null}
+          <Button title={pkg ? `Get Plus · ${pkg.product.priceString}/mo` : `Get Plus · ${PURCHASES.priceHint}`} icon="crown" kind="highlight" loading={busy} disabled={!pkg}
+            onPress={async () => { setBusy(true); try { if (await buyPlus(pkg)) { set({ isPlus: true }); showToast('Welcome to Plus!'); onClose(); } } catch (e) { if (!e.userCancelled) showToast(e.message); } setBusy(false); }} />
+          <Pressable onPress={async () => { try { const ok = await restorePlus(); set({ isPlus: ok }); showToast(ok ? 'Plus restored' : 'No purchase found'); } catch (e) { showToast(e.message); } }} style={{ alignItems: 'center', marginTop: 12 }}>
             <T kind="hand" color={t.pencil}>restore purchase</T>
           </Pressable>
-          <T kind="small" style={{ fontSize: 11, textAlign: 'center', marginTop: 6 }}>
-            Flyer Plus is a monthly auto-renewing subscription{pkg ? ` at ${price}` : ''}. Payment is charged to your Apple ID when you confirm. It renews automatically unless you cancel at least 24 hours before the end of the current period. Manage or cancel any time in your App Store account settings.
-          </T>
-          <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 6 }}>
-            <Pressable onPress={() => openUrl(APP.termsUrl)} hitSlop={8} accessibilityRole="link"><T kind="small" color={t.accent} style={{ fontSize: 12 }}>Terms of Use</T></Pressable>
-            <T kind="small" style={{ fontSize: 12, marginHorizontal: 8 }}>·</T>
-            <Pressable onPress={() => openUrl(APP.privacyUrl)} hitSlop={8} accessibilityRole="link"><T kind="small" color={t.accent} style={{ fontSize: 12 }}>Privacy Policy</T></Pressable>
-          </View>
+          <T kind="small" style={{ fontSize: 11, textAlign: 'center', marginTop: 6 }}>Renews monthly until canceled in your App Store settings.</T>
         </View>
       )}>
-      {offering === undefined && purchasesAvailable() ? <Loading /> : null}
+      {offering === undefined ? <Loading /> : null}
       <PostIt color="yellow" tilt={-1.2} tape padding={18}>
         {perks.map(([icon, label]) => (
           <View key={label} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6 }}>
@@ -135,31 +106,28 @@ export function PlusSheet({ onClose }) {
 /* ---------- Guest → account ---------- */
 export function AccountSheet({ onClose }) {
   const { t } = useTheme();
-  const { userName, set, showToast, claimData } = useApp();
+  const { userName, set, showToast } = useApp();
   const [name, setName] = useState(userName);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [appleBusy, setAppleBusy] = useState(false);
+  const appleReady = useAppleAvailable();
+  const apple = async () => {
+    setError(null); setAppleBusy(true);
+    try { await appleSignIn(AppleAuth, Crypto); showToast('Signed in'); onClose(); } catch (e) { const m = appleErrorMessage(e); if (m) { setError(m); logClientError('account-sheet-apple', e); } }
+    setAppleBusy(false);
+  };
   const create = async () => {
     setBusy(true); setError(null);
-    const problem = await nameProblem(name);
-    if (problem) { setError(problem); setBusy(false); return; }
-    try { const nu = await emailSignUp(email.trim(), password, name.trim()); claimData(nu?.uid); set({ userName: name.trim() }); showToast('Account created'); onClose(); } catch (e) { setError(e.message); }
+    try { await emailSignUp(email.trim(), password, name.trim()); set({ userName: name.trim() }); showToast('Account created'); onClose(); } catch (e) { setError(e.message); }
     setBusy(false);
   };
   return (
     <Sheet title="Make your account" hand="Everything you've set up comes with you." onClose={onClose}
       footer={<Button title="Create account" icon="check" loading={busy} disabled={!email || password.length < 6 || !name.trim()} onPress={create} />}>
-      {AppleAuth ? <Button title="Continue with Apple" icon="lock" kind="ghost" onPress={async () => { try {
-        const r = await appleSignIn(AppleAuth, Crypto);
-        claimData(r.user?.uid);
-        // Signed in to an existing account: load its profile so this phone's
-        // guest name and avatar don't overwrite it.
-        const prof = r.switched ? await getMyProfile(r.user.uid) : null;
-        if (prof && prof.name) set({ userName: prof.name, avatar: { ...DEFAULT_AVATAR, ...(prof.avatar || {}) }, schoolId: prof.schoolId || 'ttu' });
-        showToast('Signed in'); onClose();
-      } catch (e) { if (!/cancel/i.test(e.code || '')) setError(e.message); } }} style={{ marginBottom: 14 }} /> : null}
+      {appleReady ? <View style={{ marginBottom: 14 }}><AppleButton onPress={apple} busy={appleBusy} dark={t.mode === 'dark'} /></View> : null}
       <Field label="First name" value={name} onChangeText={setName} autoCapitalize="words" />
       <Field label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
       <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry placeholder="6+ characters" />

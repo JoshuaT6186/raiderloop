@@ -1,0 +1,22 @@
+:root { --paper: #FBF7EC; --ink: #1F2A44; --soft: #4B5571; --yellow: #FFEB85; --blue: #BFE3F8; --green: #CDEDB5; --accent: #2F5DA8; --rule: #CFE0F2; }
+@media (prefers-color-scheme: dark) { :root { --paper: #1E2A25; --ink: #F4F1E6; --soft: #CFCBBD; --rule: rgba(255,255,255,.06); } }
+* { box-sizing: border-box; }
+body { margin: 0; width: 340px; font: 14px/1.4 Nunito, system-ui, -apple-system, sans-serif; color: var(--ink); background: var(--paper); background-image: repeating-linear-gradient(transparent 0 23px, var(--rule) 23px 24px); }
+header { display: flex; align-items: baseline; gap: 8px; padding: 12px 14px 4px; }
+.logo { font-weight: 800; font-size: 17px; }
+.hand { font-family: "Caveat", "Bradley Hand", cursive; font-size: 19px; color: var(--soft); }
+main { padding: 4px 14px 8px; }
+.note { background: var(--yellow); color: #1F2A44; padding: 12px; border-radius: 3px 3px 12px 3px; box-shadow: 0 2px 8px rgba(0,0,0,.12); margin: 10px 0; transform: rotate(-.5deg); position: relative; }
+.note.blue { background: var(--blue); transform: rotate(.5deg); }
+.note.green { background: var(--green); }
+.note h2 { margin: 0 0 4px; font-size: 15px; }
+.note p { margin: 4px 0; }
+.code { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; }
+.code b { font-family: ui-monospace, Menlo, monospace; background: #fff; border: 1.5px dashed #1F2A44; padding: 2px 8px; border-radius: 6px; }
+button, .btn { font: inherit; font-weight: 800; background: var(--accent); color: #fff; border: 0; border-radius: 10px; padding: 6px 10px; cursor: pointer; text-decoration: none; display: inline-block; }
+button.ghost { background: transparent; color: #1F2A44; border: 1.5px solid rgba(31,42,68,.4); }
+a { color: inherit; }
+.muted { color: var(--soft); }
+.small { font-size: 12px; }
+footer { border-top: 1px dashed rgba(127,127,127,.35); padding: 8px 14px 12px; }
+.toggle { display: flex; gap: 6px; align-items: center; font-weight: 700; font-size: 13px; }

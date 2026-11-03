@@ -1,82 +1,95 @@
-# App Store listing — Flyer
+# App Store listing: Flyer
 
 **Name:** Flyer: Campus Planner
 **Subtitle (30 chars):** Classes, campus & friends
 **Category:** Education (secondary: Lifestyle)
-**Age rating:** answer the questionnaire honestly. Flyer now has user-to-user messaging and photo sharing (friends only, filtered, reportable) and location sharing, so expect **17+** unless Apple's questionnaire says otherwise. "Unrestricted web access" = No.
+**Age rating:** answer the questionnaire honestly. Flyer has user-generated content (posts, photos, notes) and messaging-style features (Drops, Say hi), with moderation, reporting and blocking. "Unrestricted web access" = No. Expect 13+.
 
 ## Description
 Flyer folds your whole campus into one app. Built by a student, for students.
 
-PLAN YOUR WEEK
-• Add classes by hand or scan a screenshot of your schedule
-• A reminder before every class, with a heads-up when it's going to rain or turn cold
-• Track assignments, get reminders before they're due, and check off what's done
-• GPA calculator for this term and overall
-• Finals countdown and exam-time lookup
-• Export your week to your calendar in one tap
+YOUR DAY, ON ONE PAGE
+• Today as a timeline, with your free gaps and when to leave for the next class
+• Leave-now alerts with the walk time between buildings
+• A lock screen widget that counts down to when you should start walking
+• Find any room: type "Holden 104" and see the building, the floor, and the doors students use
 
-KNOW YOUR CAMPUS
-• Live map of 199 campus buildings with walking times
-• What's open right now: dining, study spots, and more, sorted by distance
-• Real dining hours and what's inside each hall
-• Commuter lot updates, official floor plans, and Citibus stops
-• One-tap safety numbers
+PLAN YOUR SEMESTER
+• Add classes by hand or scan a screenshot of your schedule
+• Drop in a syllabus and every exam and due date lands in your planner
+• See your busiest weeks coming, weeks ahead
+• GPA calculator, finals lookup, and a degree roadmap
+• Connect your Canvas calendar, Outlook, or Google Calendar
 
 FIND YOUR PEOPLE
-• 500+ student organizations, including Greek life
-• Live events and campus headlines
-• Find friends by name or @username (with a check that it's really them), scan their QR code, or invite them to Flyer, and draw your own doodle avatar
-• Message friends, or start a flock (a small group chat) with up to 15 friends
-• Send meetup cards: pick a public campus spot and a time, and Flyer checks you in when you're both there
-• Share your schedule (just free/busy, or full) with the friends you choose, and find a time everyone's free
-• Share where you are (like at a game) with only the friends you pick, for as long as you choose. Turn it off instantly anytime.
+• One Connect card with a QR code (and Apple Wallet)
+• Say hi to people who share a class or club, only if you both opt in
+• Flyer Drop: send a card, link, photo, or PDF to someone next to you
+• Group Spaces for every project: deadlines, files, polls, and a "when is everyone free" finder
+• Friends-only photos that disappear after a day, and a Story that's just for you
 
-EXPLORE
-• Flight passport: stamp new buildings, games, events, and the Rec as you explore campus
-• Rate study spots and dining halls (only after you've checked in)
-• Optional nearby alerts when a friend who also opted in is close by on campus
+KNOW YOUR CAMPUS
+• A map with friends' Postcards, events, student deals, and live "elevator out" or "seats full" taps
+• What's open right now, dining, study spots, parking, and Citibus
+• Events and tips from students and confirmed org officers
+• Office hours lines, a missed-class kit, and Safe Walk so friends know you got home
+
+PLAY A LITTLE
+• Flight Score, rubber stamps, campus scavenger hunts, and hide and seek with friends
 
 ASK PILOT
-• Tap the paper airplane and ask anything about campus
-• Snap a photo of notes or a problem and Pilot walks you through it step by step
+• Tap the paper airplane and ask anything about campus, or text it
 
 Flyer is an independent, student-built app and is not affiliated with, endorsed by, or sponsored by any university.
 
-Flyer Plus (optional monthly subscription, $4.99/month): no ads, more Pilot questions a day, and extra avatar gear. Payment is charged to your Apple ID at confirmation and renews automatically unless canceled at least 24 hours before the end of the current period. Manage or cancel it in your App Store account settings.
-Terms: https://eternityworks.dev/flyer/terms.html · Privacy: https://eternityworks.dev/flyer/privacy.html
+Flyer Plus (optional subscription): no ads, more Pilot questions a day, and extra avatar gear. Payment is charged to your Apple ID and renews unless canceled at least 24 hours before the period ends. Manage it in your App Store account settings.
+Terms: https://raiderloop-98046.web.app/terms.html · Privacy: https://raiderloop-98046.web.app/privacy.html
 
-**Keywords (100 chars):** college,campus,class schedule,planner,gpa,assignments,student,dining,friends,map,finals,university
+**Keywords (100 chars):** college,campus,class schedule,planner,gpa,syllabus,student,study group,friends,map,finals,university
 
 ## App Privacy ("nutrition label")
-- **Contact Info → Email address:** App Functionality; linked to user; not tracking
-- **Contact Info → Name:** App Functionality; linked
-- **Location → Precise location:** App Functionality (friend sharing, automatic check-ins after the user turns them on); linked; not tracking
-- **Location → Coarse location:** App Functionality (nearby alerts, opt-in); linked; not tracking
-- **User Content → Emails or text messages:** App Functionality (chat); linked
-- **User Content → Photos or videos:** App Functionality (chat photos, Pilot photos); linked
-- **User Content → Other user content:** App Functionality (ratings, shared schedule); linked
-- **Identifiers → User ID / Device ID (push token):** App Functionality; linked
-- **Identifiers → Device ID:** Third-party advertising (AdMob); tracking **only if the user allows ATT**
-- **Usage Data → Advertising data:** Third-party advertising
-- **Purchases → Purchase history:** App Functionality (RevenueCat)
+Data processed only on the phone (Apple Health, schedule, grades, Keychain connections) is **not collected**, so it isn't listed.
 
-## Review notes (paste into App Review Information)
-> Flyer is an independent, student-built campus app; it doesn't use any university login. To review without making an account, tap "Let's fly" → "Look around first". Social features need an account: [create TWO demo accounts that are friends with each other, and put both emails and passwords here, so the reviewer can see chat, flocks, and meetups].
+| Data type | Purpose | Linked to user | Tracking |
+|---|---|---|---|
+| Contact Info → Email address | App Functionality | Yes | No |
+| Contact Info → Name | App Functionality | Yes | No |
+| Contact Info → Phone number (only with Text Flyer, or if added to the Connect card) | App Functionality | Yes | No |
+| Location → Precise location (friend sharing, Safe Walk, Nearby Drop, hide and seek; all opt-in) | App Functionality | Yes | No |
+| User Content → Photos or videos (moments, Postcards, tips, Drops) | App Functionality | Yes | No |
+| User Content → Other user content (posts, notes, group files, polls) | App Functionality | Yes | No |
+| User Content → Customer support (reports you send) | App Functionality | Yes | No |
+| Identifiers → User ID | App Functionality | Yes | No |
+| Identifiers → Device ID | Third-Party Advertising (AdMob) | No | **Only if the user allows ATT** |
+| Usage Data → Advertising data | Third-Party Advertising | No | Only if allowed |
+| Purchases → Purchase history | App Functionality (RevenueCat) | Yes | No |
+| Diagnostics → Other diagnostic data (error reports) | App Functionality | Yes | No |
+
+## Review notes (paste into App Review Information → Notes)
+Fill in the parts in [brackets] first. Only say it was tested once you've tried it on your phone.
+> Thank you for the review. Changes for the issues in the last review:
+> • 2.1(a): Sign in with Apple has been fixed and tested on [your iPhone model and iOS version]. Errors are now logged so we can see any failure.
+> • 5.1.1(iv): the screen shown before the location permission prompt now uses "Continue".
+> • 2.5.4: "location" has been removed from UIBackgroundModes. Flyer uses location only while the app is open.
 >
-> **User-generated content (Guideline 1.2):** messages and photos are only between accepted friends (or a flock made of friends). Text is filtered for objectionable words; photos are checked by an automated safety filter before anyone can see them. Every message has Report, Hide, and Block (press and hold a message). Every person has Report and Block (their profile and chat info). Reported content is reviewed within 24 hours; a message reported by two people is hidden immediately. Terms of use state zero tolerance for objectionable content. Messages auto-delete after 30 days.
+> Flyer is an independent, student-built campus app; it does not use any university login. Demo account: [email] / [password] (has friends, a group, and posts to look at). Without an account: "Let's fly" → "Look around first".
 >
-> **Background location (Guideline 5.1.1/2.5.4):** used by two opt-in features, both off by default. (1) Automatic check-ins for flight score, turned on in You → Flight passport: the phone compares its location with a list of campus places on the device, and only after the user has stayed at one for about 5 minutes does it send that place and one reading to confirm the visit. Coordinates and routes are not stored. Flight score is cosmetic and only works with this on. (2) Nearby alerts, turned on in Friends → Sharing: tells two friends who BOTH opted in that they're close by on campus. No one is shown anyone's location. Optional live sharing runs only while the app is open.
+> User-generated content: every photo and post is checked automatically before anyone else sees it, and unsure items are held for human review. Every post, card, Drop, group and person has Report and Block. Our terms (linked in Settings) have a zero-tolerance policy for objectionable content, and we review reports within 24 hours.
 >
-> **Account deletion (5.1.1(v)):** You → Settings → Delete account. It deletes all server data and the sign-in, and revokes Sign in with Apple tokens.
+> HealthKit: Flyer reads sleep, step count, and exercise minutes only after the user taps "Continue" in Sleep & steps, to show them next to their class schedule. Health data is never sent off the device or stored; Flyer never writes to Health.
 >
-> Pilot uses Anthropic's Claude to answer campus questions and explain photos of schoolwork step by step. Camera is used for QR codes and photos the user chooses to send.
+> Location (When In Use only) is used for walking times on the device and, only when the user starts them, friend sharing, Safe Walk, Nearby Drop, and hide and seek.
+>
+> Extensions: a home and lock screen widget (next class and leave time), and a Messages app (plan polls and sending saved events). Apple Wallet: an optional pass showing the user's Connect card QR.
+>
+> Pilot uses Anthropic's Claude to answer campus questions.
 
 ## Screenshots to take (6.9" iPhone)
-1. Home ("Good morning" + weather + up next + a meetup card)
-2. Flight passport with stamps
-3. Campus map with the Rate card on a building
-4. A flock chat with a meetup card
-5. Find a time we're all free
-6. Pilot explaining a photo of notes
-7. Avatar studio
+1. Home timeline with a free gap and "Leave in…"
+2. Room finder showing a building, floor, and door tips
+3. Discover corkboard (Happening lane)
+4. Campus map with Postcards and status pins
+5. You → Connect card with the QR
+6. Planner → Week (busiest week chart)
+7. Group Space with deadlines and a poll
+8. Messages poll (from the Messages app drawer)

@@ -1,12 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Pressable } from 'react-native';
 import { useApp } from '../../state/AppContext';
 import { useTheme } from '../../theme/ThemeContext';
 import { T, Button, Field, Card, Divider } from '../../ui/Paper';
 import Icon from '../../ui/Icon';
 import { Shell, Heading } from './Shell';
-import { emailSignUp, emailSignIn, guestSignIn, appleSignIn, resetPassword, getMyProfile } from '../../lib/firebase';
-import { DEFAULT_AVATAR } from '../../ui/avatarParts';
+import { emailSignUp, emailSignIn, guestSignIn, appleSignIn, resetPassword, appleErrorMessage, logClientError } from '../../lib/firebase';
 import { AppleAuth, Crypto } from '../../lib/native';
 
 const friendly = (e) => {
@@ -20,9 +19,37 @@ const friendly = (e) => {
   return e?.message || 'Something went wrong.';
 };
 
+/* Apple's own button (App Review expects it), shown only when Sign in
+   with Apple is actually available on this phone. */
+export function useAppleAvailable() {
+  const [ok, setOk] = useState(false);
+  useEffect(() => {
+    let live = true;
+    if (AppleAuth && AppleAuth.isAvailableAsync) AppleAuth.isAvailableAsync().then((v) => { if (live) setOk(!!v); }).catch(() => {});
+    return () => { live = false; };
+  }, []);
+  return ok;
+}
+
+export function AppleButton({ onPress, busy, dark }) {
+  const Native = AppleAuth && AppleAuth.AppleAuthenticationButton;
+  if (!Native) return <Button title="Continue with Apple" icon="lock" kind="ghost" loading={busy} onPress={onPress} />;
+  return (
+    <View style={{ opacity: busy ? 0.6 : 1 }} pointerEvents={busy ? 'none' : 'auto'}>
+      <Native
+        buttonType={AppleAuth.AppleAuthenticationButtonType.CONTINUE}
+        buttonStyle={dark ? AppleAuth.AppleAuthenticationButtonStyle.WHITE : AppleAuth.AppleAuthenticationButtonStyle.BLACK}
+        cornerRadius={14}
+        style={{ width: '100%', height: 50 }}
+        onPress={onPress}
+      />
+    </View>
+  );
+}
+
 export default function Account() {
   const { t } = useTheme();
-  const { set, userName, claimData } = useApp();
+  const { set, userName } = useApp();
   const [mode, setMode] = useState('create'); // create | signin
   const [name, setName] = useState(userName || '');
   const [email, setEmail] = useState('');
@@ -30,35 +57,20 @@ export default function Account() {
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
   const [info, setInfo] = useState(null);
+  const appleReady = useAppleAvailable();
 
   const next = (patch = {}) => set({ ...patch, onboardStep: 'school' });
-
-  /* Someone who already finished setup (new phone, or signed out and back
-     in) doesn't redo it. An account only has a saved profile once setup
-     was completed, so that's the signal. Their name, avatar and school
-     come back from the server; only the permissions screen is left. */
-  const continueAs = async (user, fallback = {}) => {
-    const prof = user && !user.isAnonymous ? await getMyProfile(user.uid) : null;
-    if (prof && prof.name && prof.avatar) {
-      set({
-        userName: prof.name, avatar: { ...DEFAULT_AVATAR, ...prof.avatar }, schoolId: prof.schoolId || 'ttu',
-        onboardStep: 'welcomeback',
-      });
-    } else next(fallback);
-  };
 
   const submit = async () => {
     setError(null); setInfo(null); setBusy('email');
     try {
       if (mode === 'create') {
         if (!name.trim()) { setError('Add your first name so friends know it\'s you.'); setBusy(null); return; }
-        const nu = await emailSignUp(email.trim(), password, name.trim());
-        claimData(nu?.uid);
+        await emailSignUp(email.trim(), password, name.trim());
         next({ userName: name.trim() });
       } else {
         const u = await emailSignIn(email.trim(), password);
-        claimData(u?.uid);
-        await continueAs(u, u.displayName ? { userName: u.displayName } : {});
+        next(u.displayName ? { userName: u.displayName } : {});
       }
     } catch (e) { setError(friendly(e)); }
     setBusy(null);
@@ -67,18 +79,18 @@ export default function Account() {
   const apple = async () => {
     setError(null); setBusy('apple');
     try {
-      const res = await appleSignIn(AppleAuth, Crypto);
-      claimData((res.user || res)?.uid);
-      await continueAs(res.user || res, res.name ? { userName: res.name } : {});
-    } catch (e) { const m = friendly(e); if (m) setError(m); }
+      const { name: n } = await appleSignIn(AppleAuth, Crypto);
+      next(n ? { userName: n } : {});
+    } catch (e) {
+      const m = appleErrorMessage(e);
+      if (m) { setError(m); logClientError('onboarding-apple', e); }
+    }
     setBusy(null);
   };
 
   const guest = async () => {
     setBusy('guest');
-    let guestUid = null;
-    try { const r = await guestSignIn(); guestUid = r?.user?.uid || null; } catch (e) { /* offline is fine, local features still work */ }
-    claimData(guestUid); // a guest never sees the last account's schedule
+    try { await guestSignIn(); } catch (e) { /* offline is fine — local features still work */ }
     next();
     setBusy(null);
   };
@@ -89,9 +101,9 @@ export default function Account() {
       <Heading eyebrow="step one" title={mode === 'create' ? 'Make your account' : 'Welcome back'}
         sub="An account lets friends find you and keeps your stuff if you switch phones." />
 
-      {AppleAuth ? (
+      {appleReady ? (
         <>
-          <Button title="Continue with Apple" icon="lock" kind="ghost" loading={busy === 'apple'} onPress={apple} />
+          <AppleButton onPress={apple} busy={busy === 'apple'} dark={t.mode === 'dark'} />
           <Divider />
         </>
       ) : null}

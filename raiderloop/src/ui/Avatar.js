@@ -13,60 +13,27 @@ const INK = '#1F2A44';
 const SW = 2.2;
 const circle = (cx, cy, r) => `M${cx - r} ${cy} a ${r} ${r} 0 1 0 ${2 * r} 0 a ${r} ${r} 0 1 0 ${-2 * r} 0 Z`;
 
-const rad = (d) => (d * Math.PI) / 180;
-/* Arc from angle a0 to a1 (degrees; 0 = right, 90 = top) as quadratic
-   segments. puff = 0 gives a smooth dome, > 0 gives scalloped "cloud" hair. */
-function scallop(cx, cy, rx, ry, a0, a1, n, puff = 0) {
-  const step = (a1 - a0) / n;
-  const k = 1 / Math.cos(rad(Math.abs(step) / 2)) + puff;
-  const pt = (deg, m = 1) => `${(cx + rx * m * Math.cos(rad(deg))).toFixed(1)} ${(cy - ry * m * Math.sin(rad(deg))).toFixed(1)}`;
-  let d = `M${pt(a0)}`;
-  for (let i = 0; i < n; i++) d += ` Q${pt(a0 + step * (i + 0.5), k)} ${pt(a0 + step * (i + 1))}`;
-  return d;
-}
-
-/* The hair "mass" drawn BEHIND the head. It extends past the skull so hair
-   has real volume instead of reading as a thin band. */
-const SHORT_DOME = `${scallop(50, 42, 26, 28.5, 200, -20, 12)} Z`;
-const DOME = {
-  buzz: `${scallop(50, 43.5, 23.4, 26.4, 196, -16, 10)} Z`,
-  short: SHORT_DOME,
-  side: `${scallop(51, 42, 26.5, 28.5, 200, -20, 12)} Z`,
-  curly: `${scallop(50, 40, 25.5, 26.5, 198, -18, 11, 0.16)} C 75 52 72 56 66 56 L 34 56 C 28 56 25 52 24.5 45 Z`,
-  afro: `${scallop(50, 36, 29.5, 29.5, 202, -22, 13, 0.1)} C 78 54 74 60 66 60 L 34 60 C 26 60 22 54 22.6 47 Z`,
-  long: 'M24.5 46 C 21 3 79 3 75.5 46 C 79 66 77 84 69 91 L 31 91 C 23 84 21 66 24.5 46 Z',
-  bob: 'M24.5 46 C 21 3 79 3 75.5 46 C 79 58 78 70 71 75 L 29 75 C 22 70 21 58 24.5 46 Z',
-  bun: SHORT_DOME,
-  ponytail: SHORT_DOME,
-  braids: SHORT_DOME,
-  locs: SHORT_DOME,
+const HAIR_BACK = {
+  afro: circle(50, 38, 29),
+  long: 'M27 44 C 23 66 25 84 33 88 L 67 88 C 75 84 77 66 73 44 Z',
+  bob: 'M26 44 C 24 60 27 70 34 71 L 66 71 C 73 70 76 60 74 44 Z',
+  ponytail: 'M67 38 C 86 44 86 70 75 80 C 78 64 75 52 64 45 Z',
+  braids: 'M28 48 L 29 88 L 37 88 L 36 48 Z M64 48 L 63 88 L 71 88 L 72 48 Z',
+  locs: 'M27 44 L 26 82 L 32 82 L 33 54 Z M34 52 L 34 86 L 39 86 L 39 56 Z M61 56 L 61 86 L 66 86 L 66 52 Z M67 54 L 68 82 L 74 82 L 73 44 Z',
 };
-/* With a hat on, only the parts that hang below it are drawn. */
-const FALL = {
-  long: 'M26 44 C 22 66 24 84 32 90 L 68 90 C 76 84 78 66 74 44 Z',
-  bob: 'M26 44 C 24 58 25 70 31 74 L 69 74 C 75 70 76 58 74 44 Z',
+const HAIR_FRONT = {
+  buzz: 'M30 44 C 29 25 71 25 70 44 C 66 34 34 34 30 44 Z',
+  short: 'M28 46 C 25 21 75 19 72 46 C 68 36 58 32 50 33 C 42 32 32 36 28 46 Z',
+  side: 'M28 48 C 23 19 77 17 72 46 C 70 38 64 33 57 33 C 49 37 39 30 33 38 C 30 41 29 44 28 48 Z',
+  curly: 'M27 46 a6 6 0 0 1 4-10 a6 6 0 0 1 8-8 a6 6 0 0 1 11-3 a6 6 0 0 1 11 3 a6 6 0 0 1 8 8 a6 6 0 0 1 4 10 C 66 37 34 37 27 46 Z',
+  afro: 'M29 44 C 32 32 68 32 71 44 C 70 30 60 26 50 26 C 40 26 30 30 29 44 Z',
+  long: 'M27 50 C 23 18 77 18 73 50 C 70 36 62 30 50 30 C 40 34 33 38 27 50 Z',
+  bob: 'M26 48 C 23 18 77 18 74 48 C 72 38 64 33 56 34 C 48 40 34 38 26 48 Z',
+  bun: 'M28 46 C 25 21 75 19 72 46 C 68 36 58 32 50 33 C 42 32 32 36 28 46 Z',
+  ponytail: 'M28 46 C 25 21 75 19 72 46 C 68 37 58 33 50 33 C 42 33 32 37 28 46 Z',
+  braids: 'M28 48 C 26 22 74 22 72 48 C 68 36 56 32 50 30 C 44 32 32 36 28 48 Z',
+  locs: 'M27 46 C 25 21 75 19 73 46 C 68 37 58 32 50 33 C 42 32 32 37 27 46 Z',
 };
-const PONYTAIL = 'M66 33 C 91 35 91 70 74 85 C 79 66 76 53 65 46 Z';
-
-/* Hairline: an open curve across the forehead from the left temple to the
-   right. The front hair is filled above it and clipped to the head, with no
-   hard outline, so the hair blends into the skull instead of forming a band. */
-const SHORT_HL = 'M29 46 C 28.5 40 31.5 36.5 37 35 C 42 33.8 46 36.8 50 36 C 55 35 59 33.5 64 35 C 69 36.5 71.5 40 71 46';
-const PART_HL = 'M29 46 C 28 38 34 33.5 48.5 33 L 50 34.8 L 51.5 33 C 66 33.5 72 38 71 46';
-const HAIRLINE = {
-  buzz: 'M29 45 C 29 39 34 35.2 50 34.6 C 66 35.2 71 39 71 45',
-  short: SHORT_HL,
-  side: 'M29 47 C 27.5 41 30 37 35 35.5 C 41 34 47 38.5 55 37.5 C 62 36.5 70 36 71 46',
-  curly: 'M29 46 C 29 41 32 38 35 37 q 3.2 4.6 6.4 0 q 3.2 4.6 6.4 0 q 3.2 4.6 6.4 0 q 3.2 4.6 6.4 0 q 3.2 4.6 6.4 0 C 68 38 71 41 71 46',
-  afro: 'M29 46 C 29 38 36 32.8 50 32.4 C 64 32.8 71 38 71 46',
-  long: PART_HL,
-  bob: 'M29 46 C 29 39 32 37 37 37 C 44 39 56 39 63 37 C 68 37 71 39 71 46',
-  bun: SHORT_HL,
-  ponytail: SHORT_HL,
-  braids: PART_HL,
-  locs: PART_HL,
-};
-const frontFill = (hl) => `M20 46 ${hl.replace(/^M/, 'L')} L 80 46 L 80 5 L 20 5 Z`;
 
 const SHIRT_BODY = 'M16 100 C 18 83 33 76 50 76 C 67 76 82 83 84 100 Z';
 
@@ -87,16 +54,12 @@ export default function Avatar({ config, size = 56, ring = true, bg = true, styl
       <Svg width="100%" height="100%" viewBox="0 0 100 100">
         <Defs>
           <ClipPath id={clipId}><Circle cx="50" cy="50" r="50" /></ClipPath>
-          <ClipPath id="hairclip"><Ellipse cx="50" cy="47" rx="22.4" ry="25.4" /></ClipPath>
         </Defs>
         <G clipPath={`url(#${clipId})`}>
           {bg ? <Path d="M10 20 l4 0 M80 14 l3 3 M86 60 l4 -2 M8 70 l3 3" stroke={INK} strokeOpacity={0.18} strokeWidth={2} strokeLinecap="round" /> : null}
 
-          {/* hair behind the head (full mass, or just what hangs below a hat) */}
-          {a.hair === 'bun' && !hasHat ? <Path d={circle(50, 13.5, 8.2)} fill={hair} stroke={INK} strokeWidth={SW} /> : null}
-          {a.hair === 'ponytail' ? <Path d={PONYTAIL} fill={hair} stroke={INK} strokeWidth={SW} strokeLinejoin="round" /> : null}
-          {!hasHat && DOME[a.hair] ? <Path d={DOME[a.hair]} fill={hair} stroke={INK} strokeWidth={SW} strokeLinejoin="round" /> : null}
-          {hasHat && FALL[a.hair] ? <Path d={FALL[a.hair]} fill={hair} stroke={INK} strokeWidth={SW} strokeLinejoin="round" /> : null}
+          {/* hair behind */}
+          {HAIR_BACK[a.hair] ? <Path d={HAIR_BACK[a.hair]} fill={hair} stroke={INK} strokeWidth={SW} strokeLinejoin="round" /> : null}
 
           {/* body */}
           <Path d={SHIRT_BODY} fill={a.shirtColor} stroke={INK} strokeWidth={SW} />
@@ -114,20 +77,6 @@ export default function Avatar({ config, size = 56, ring = true, bg = true, styl
             </>
           ) : null}
           {a.shirt === 'tee' ? <Path d="M43 77 Q 50 83 57 77" stroke={INK} strokeWidth={1.8} fill="none" /> : null}
-
-          {/* braids and locs hang in front of the shoulders */}
-          {a.hair === 'braids' ? [26.5, 73.5].map((x) => [58, 65.5, 73, 80.5].map((y) => (
-            <Ellipse key={`${x}-${y}`} cx={x} cy={y} rx="4.4" ry="5" fill={hair} stroke={INK} strokeWidth={SW} />
-          ))) : null}
-          {a.hair === 'locs' ? [[25.5, 50, 76, -1.5], [31.5, 54, 88, 1], [68.5, 54, 88, -1], [74.5, 50, 76, 1.5]].map(([x, y0, y1, dx]) => {
-            const d = `M${x} ${y0} Q ${x + dx * 2} ${(y0 + y1) / 2} ${x + dx} ${y1}`;
-            return (
-              <G key={x}>
-                <Path d={d} stroke={INK} strokeWidth={8.8} strokeLinecap="round" fill="none" />
-                <Path d={d} stroke={hair} strokeWidth={4.6} strokeLinecap="round" fill="none" />
-              </G>
-            );
-          }) : null}
 
           {/* neck + ears + head */}
           <Rect x="44" y="64" width="12" height="13" fill={a.skin} stroke={INK} strokeWidth={SW} />
@@ -165,13 +114,9 @@ export default function Avatar({ config, size = 56, ring = true, bg = true, styl
           ) : null}
           <Mouth kind={a.mouth} />
 
-          {/* hair in front: filled down to the hairline, clipped to the head */}
-          {(!hasHat || a.hat === 'headphones') && HAIRLINE[a.hair] ? (
-            <G clipPath="url(#hairclip)">
-              <Path d={frontFill(HAIRLINE[a.hair])} fill={hair} />
-              <Path d={HAIRLINE[a.hair]} stroke={INK} strokeOpacity={0.28} strokeWidth={1.3} strokeLinecap="round" fill="none" />
-            </G>
-          ) : null}
+          {/* hair front */}
+          {!hasHat || a.hat === 'headphones' ? (HAIR_FRONT[a.hair] ? <Path d={HAIR_FRONT[a.hair]} fill={hair} stroke={INK} strokeWidth={SW} strokeLinejoin="round" /> : null) : null}
+          {a.hair === 'bun' && !hasHat ? <Circle cx="50" cy="19" r="8" fill={hair} stroke={INK} strokeWidth={SW} /> : null}
 
           {/* glasses */}
           {a.accessory === 'round' ? (

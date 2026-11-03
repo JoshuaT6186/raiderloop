@@ -59,7 +59,7 @@ export default function Finals() {
             const ex = findExam(grid, c);
             return (
               <Row key={c.id} title={c.title} last={i === classes.length - 1}
-                meta={ex ? metaLine(ex.examDate, ex.examTime) : `${(c.days || []).join('/')} ${c.time} · no grid match (could be a common final or arranged exam)`}
+                meta={ex ? metaLine(ex.examDate, ex.examTime) : `${(c.days || []).join('/')} ${c.time}: no grid match (could be a common final or arranged exam)`}
                 right={ex ? <Stamp label="Found" color={t.ok} /> : null} />
             );
           })}

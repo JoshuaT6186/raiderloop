@@ -1,0 +1,10 @@
+{
+  "formatVersion": 1,
+  "organizationName": "Flyer",
+  "description": "Flyer Connect card",
+  "foregroundColor": "rgb(31, 42, 68)",
+  "labelColor": "rgb(75, 85, 113)",
+  "backgroundColor": "rgb(255, 235, 133)",
+  "sharingProhibited": false,
+  "generic": {}
+}

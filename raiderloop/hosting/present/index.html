@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Flyer · Present</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="/favicon.png">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Nunito:wght@600;800&family=Permanent+Marker&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<style>
+  :root { --paper:#FBF7EC; --rule:#CFE0F2; --ink:#1F2A44; --soft:#4B5571; --yellow:#FFEB85; }
+  * { box-sizing:border-box }
+  html,body { margin:0; height:100%; background:var(--paper); color:var(--ink); font-family:Nunito,system-ui,sans-serif; overflow:hidden }
+  body { background-image:repeating-linear-gradient(transparent 0 39px, var(--rule) 39px 40px) }
+  #pair { height:100%; display:flex; align-items:center; justify-content:center; gap:6vw; padding:4vw }
+  .note { background:var(--yellow); padding:3vw 3.5vw; border-radius:6px 6px 40px 6px; box-shadow:0 10px 30px rgba(0,0,0,.15); transform:rotate(-1.2deg); max-width:46vw }
+  h1 { font-family:'Permanent Marker',cursive; font-size:4.2vw; margin:0 0 1vw; line-height:1.1 }
+  .code { font-family:'Permanent Marker',cursive; font-size:9vw; letter-spacing:.6vw; margin:1vw 0 }
+  .hand { font-family:Caveat,cursive; font-size:2.6vw; color:var(--soft) }
+  #qr svg { width:24vw; height:24vw; background:#fff; padding:1vw; border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,.12) }
+  #stage { position:fixed; inset:0; display:none; background:#111; align-items:center; justify-content:center }
+  #stage img { max-width:100%; max-height:100%; object-fit:contain }
+  #stage iframe { width:100%; height:100%; border:0; background:#fff }
+  #note { background:var(--yellow); color:var(--ink); font-size:3.4vw; padding:5vw; width:80vw; border-radius:8px; white-space:pre-wrap; font-family:Nunito,sans-serif }
+  #bar { position:fixed; left:0; right:0; bottom:0; display:flex; justify-content:space-between; align-items:center; padding:10px 18px; font-family:Nunito,sans-serif; font-size:14px; color:#fff; background:linear-gradient(transparent, rgba(0,0,0,.55)); opacity:.9 }
+  #open { display:none; position:fixed; right:18px; top:18px; background:#2F5DA8; color:#fff; border:0; border-radius:12px; padding:12px 16px; font-weight:800; font-size:16px; cursor:pointer }
+  button.fs { background:transparent; color:#fff; border:1px solid rgba(255,255,255,.6); border-radius:8px; padding:6px 10px; cursor:pointer }
+  .err { color:#C8413B; font-weight:800 }
+</style>
+</head>
+<body>
+<div id="pair">
+  <div class="note">
+    <div class="hand">Present with Flyer</div>
+    <h1>Send your slides to this screen</h1>
+    <p class="hand">On your phone: Flyer → Present → type this code, or scan the QR.</p>
+    <div class="code" id="code">······</div>
+    <div class="hand" id="status">Getting a code…</div>
+  </div>
+  <div id="qr"></div>
+</div>
+<div id="stage"><div id="content"></div></div>
+<button id="open">Open on this screen</button>
+<div id="bar" style="display:none"><span id="title"></span><span><span id="count"></span> <button class="fs" id="fs">Full screen</button> <button class="fs" id="stop">Stop</button></span></div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { getFirestore, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
+
+// Same public web config as the app (src/config.js). Not a secret.
+const app = initializeApp({
+  apiKey: 'AIzaSyCdaILApsJo7KfTKfIH5W_TueYQPr6IZRw',
+  authDomain: 'raiderloop-98046.firebaseapp.com',
+  projectId: 'raiderloop-98046',
+  storageBucket: 'raiderloop-98046.firebasestorage.app',
+  appId: '1:549349537291:web:a9d31e7635ea7f9403b90e',
+});
+const auth = getAuth(app);
+const db = getFirestore(app);
+const fns = getFunctions(app);
+const presentScreen = httpsCallable(fns, 'presentScreen');
+const presentEnd = httpsCallable(fns, 'presentEnd');
+const $ = (id) => document.getElementById(id);
+let unsub = null; let code = null;
+
+function embedUrl(url) {
+  try {
+    const u = new URL(url);
+    let m;
+    if ((m = u.pathname.match(/\/presentation\/d\/([^/]+)/)) && /docs\.google\.com$/.test(u.hostname)) return `https://docs.google.com/presentation/d/${m[1]}/embed?start=false&loop=false`;
+    if ((m = u.pathname.match(/\/(document|spreadsheets)\/d\/([^/]+)/)) && /docs\.google\.com$/.test(u.hostname)) return `https://docs.google.com/${m[1]}/d/${m[2]}/preview`;
+    if (/canva\.com$/.test(u.hostname.replace(/^www\./, '')) && /\/design\//.test(u.pathname)) { const p = u.pathname.replace(/\/(edit|view)$/, '/view'); return `https://www.canva.com${p}?embed`; }
+    if (/(^|\.)youtube\.com$/.test(u.hostname) && u.searchParams.get('v')) return `https://www.youtube.com/embed/${u.searchParams.get('v')}`;
+    if (u.hostname === 'youtu.be') return `https://www.youtube.com/embed${u.pathname}`;
+    return null;
+  } catch (e) { return null; }
+}
+
+function showPair() {
+  $('pair').style.display = 'flex'; $('stage').style.display = 'none'; $('bar').style.display = 'none'; $('open').style.display = 'none';
+}
+function render(item, claimed) {
+  if (!item) {
+    showPair();
+    $('status').textContent = claimed ? 'Connected! Pick something to show on your phone.' : 'Waiting for a phone…';
+    return;
+  }
+  $('pair').style.display = 'none'; $('stage').style.display = 'flex'; $('bar').style.display = 'flex'; $('open').style.display = 'none';
+  $('title').textContent = item.title || '';
+  $('count').textContent = '';
+  const c = $('content');
+  c.style.cssText = 'width:100%;height:100%;display:flex;align-items:center;justify-content:center';
+  if (item.kind === 'images') {
+    const i = Math.max(0, Math.min((item.images || []).length - 1, item.index || 0));
+    c.innerHTML = `<img alt="" src="${item.images[i]}">`;
+    $('count').textContent = `${i + 1} / ${item.images.length}`;
+  } else if (item.kind === 'pdf') {
+    c.innerHTML = `<iframe src="${item.url}#view=FitH" title="PDF"></iframe>`;
+  } else if (item.kind === 'note') {
+    c.innerHTML = '<div id="note"></div>'; $('note').textContent = item.text || '';
+  } else if (item.kind === 'link') {
+    const e = embedUrl(item.url);
+    if (e) c.innerHTML = `<iframe src="${e}" allow="autoplay; fullscreen" allowfullscreen title="Shared link"></iframe>`;
+    else {
+      const q = qrcode(0, 'M'); q.addData(item.url); q.make();
+      c.innerHTML = `<div class="note" style="max-width:70vw"><h1>Open this link here</h1><p class="hand" style="word-break:break-all">${item.url.replace(/</g, '&lt;')}</p>${q.createSvgTag({ cellSize: 6, margin: 2 })}</div>`;
+    }
+    $('open').style.display = 'block';
+    $('open').onclick = () => window.open(item.url, '_blank', 'noopener');
+  }
+}
+
+async function newCode() {
+  if (unsub) { unsub(); unsub = null; }
+  $('status').textContent = 'Getting a code…';
+  try {
+    const r = await presentScreen({});
+    code = r.data.code;
+    $('code').textContent = code;
+    const q = qrcode(0, 'M'); q.addData(`${location.origin}/t/${code}`); q.make();
+    $('qr').innerHTML = q.createSvgTag({ cellSize: 8, margin: 2 });
+    $('status').textContent = 'Waiting for a phone…';
+    unsub = onSnapshot(doc(db, 'present', code), (s) => {
+      if (!s.exists()) { newCode(); return; }
+      const v = s.data();
+      render(v.item, !!v.owner);
+    }, () => { $('status').innerHTML = '<span class="err">Lost connection. Refresh the page.</span>'; });
+  } catch (e) {
+    $('status').innerHTML = `<span class="err">${(e && e.message) || "Couldn't get a code."} Refresh to try again.</span>`;
+  }
+}
+
+$('fs').onclick = () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {});
+$('stop').onclick = async () => { try { await presentEnd({ code }); } catch (e) { /* already ended */ } };
+onAuthStateChanged(auth, (u) => { if (u && !code) newCode(); });
+signInAnonymously(auth).catch(() => { $('status').innerHTML = '<span class="err">This screen couldn\'t connect. Check the internet and refresh.</span>'; });
+</script>
+</body>
+</html>

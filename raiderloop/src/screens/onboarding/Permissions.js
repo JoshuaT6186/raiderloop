@@ -1,6 +1,10 @@
 /**
  * Permissions are asked here with a plain-English reason first, and
- * every one is optional, and declining never blocks onboarding.
+ * every one is optional — declining never blocks onboarding.
+ *
+ * App Review (Guideline 5.1.1 iv): the button that leads to the system
+ * prompt must not say "Allow". It says "Continue", and the iOS prompt
+ * that follows is where the real choice happens.
  */
 import React, { useState } from 'react';
 import { View } from 'react-native';
@@ -14,7 +18,7 @@ import { getForegroundPermission } from '../../lib/location';
 import { initAds } from '../../lib/monetize';
 import { Notifications, Location, Tracking } from '../../lib/native';
 
-function Perm({ icon, title, body, state, onAsk, color, askLabel = 'Allow' }) {
+function Perm({ icon, title, body, state, onAsk, color }) {
   const { t } = useTheme();
   return (
     <Card style={{ marginBottom: 12 }}>
@@ -27,8 +31,8 @@ function Perm({ icon, title, body, state, onAsk, color, askLabel = 'Allow' }) {
           <T kind="small" style={{ marginTop: 2 }}>{body}</T>
           <View style={{ marginTop: 10, flexDirection: 'row' }}>
             {state === 'granted' ? <Stamp label="On" color={t.ok} />
-              : state === 'denied' ? <Stamp label="Off in Settings" color={t.pencil} />
-                : <Button title={askLabel} small onPress={onAsk} />}
+              : state === 'denied' ? <Stamp label="Off · change in Settings" color={t.pencil} />
+                : <Button title="Continue" small onPress={onAsk} />}
           </View>
         </View>
       </View>
@@ -36,19 +40,15 @@ function Perm({ icon, title, body, state, onAsk, color, askLabel = 'Allow' }) {
   );
 }
 
-export default function Permissions({ returning = false }) {
-  const { set, userName } = useApp();
+export default function Permissions() {
+  const { set } = useApp();
   const [notif, setNotif] = useState(Notifications ? 'ask' : 'denied');
   const [loc, setLoc] = useState(Location ? 'ask' : 'denied');
   const [ads, setAds] = useState(Tracking ? 'ask' : null);
   return (
-    <Shell step={returning ? 'welcomeback' : 'permissions'} onBack={returning ? null : () => set({ onboardStep: 'schedule' })}
-      footer={returning
-        ? <Button title="Take off" icon="plane" onPress={() => set({ onboarded: true, onboardStep: 'welcome', adConsentAsked: true })} />
-        : <Button title="Continue" icon="chevronRight" onPress={() => set({ onboardStep: 'tour', adConsentAsked: true })} />}>
-      {returning
-        ? <Heading eyebrow="welcome back" title={`Good to see you, ${userName || 'friend'}`} sub="Your profile is back. This phone just needs a few quick yeses. All optional, and you can change them later in Settings." />
-        : <Heading eyebrow="step seven" title="A few quick yeses" sub="All optional. You can change any of these later in Settings." />}
+    <Shell step="permissions" onBack={() => set({ onboardStep: 'schedule' })}
+      footer={<Button title="Continue" icon="chevronRight" onPress={() => set({ onboardStep: 'tour', adConsentAsked: true })} />}>
+      <Heading eyebrow="step seven" title="A few quick yeses" sub="All optional. You can change any of these later in Settings." />
       <Perm icon="bell" color="yellow" title="Reminders" state={notif}
         body="A nudge before each class (with rain or cold heads-ups), before assignments are due, and before saved events."
         onAsk={async () => setNotif((await ensureNotificationPermission(true)) ? 'granted' : 'denied')} />
@@ -56,14 +56,9 @@ export default function Permissions({ returning = false }) {
         body="Sorts what's open by real walking distance. Friends can only ever see you if you turn on sharing and pick them. That's separate."
         onAsk={async () => setLoc((await getForegroundPermission(true)) ? 'granted' : 'denied')} />
       {ads ? (
-        <Perm icon="tag" color="pink" title="Ads that keep Flyer free" state={ads} askLabel="Continue"
+        <Perm icon="tag" color="pink" title="Ads that keep Flyer free" state={ads}
           body="iOS will ask if apps can track you across other apps. Saying no is totally fine. You'll still see ads, just less relevant ones. Your schedule, location, and friends are never shared with advertisers."
-          onAsk={async () => {
-            // Ask Apple's tracking question directly, then start ads either way.
-            const st = await Tracking.requestTrackingPermissionsAsync().catch(() => null);
-            await initAds({ askTracking: false });
-            setAds(st?.status === 'granted' ? 'granted' : st?.status === 'denied' ? 'denied' : 'ask');
-          }} />
+          onAsk={async () => { await initAds({ askTracking: true }); setAds('granted'); }} />
       ) : null}
     </Shell>
   );

@@ -16,7 +16,8 @@ import { metaLine } from '../lib/time';
 import {
   BUILDINGS, DINING, STUDY, distanceM, walkMinutes, COMMUTER_LOTS, PARKING_LINKS, catLabel,
 } from '../data/campus';
-import { SAFETY } from '../config';
+import { SAFETY, CHECKED } from '../config';
+import LastChecked from '../ui/LastChecked';
 
 /* ---------- What's open near me ---------- */
 export function OpenNowSheet({ onClose }) {
@@ -36,7 +37,7 @@ export function OpenNowSheet({ onClose }) {
       .filter((x) => isOpenNow(x.hours) === true)
       .map((x) => {
         const m = pos ? distanceM(pos, x) : null;
-        return { ...x, mins: m != null ? walkMinutes(m) : null, closesIn: minutesUntilClose(x.hours) };
+        return { ...x, mins: m != null ? walkMinutes(m) : x.walk, closesIn: minutesUntilClose(x.hours) };
       })
       .sort((a, b) => (a.mins ?? 99) - (b.mins ?? 99));
   }, [pos]);
@@ -91,7 +92,7 @@ export function ParkingSheet({ onClose }) {
           <View key={lot} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }}>
             <View style={{ width: 54 }}><T kind="title">{lot}</T></View>
             {l ? <Meter pct={l.percentFull} /> : <T kind="small" style={{ flex: 1 }}>not in today's update</T>}
-            <T kind="num" style={{ width: 54, textAlign: 'right' }}>{l ? `${l.percentFull}%` : 'N/A'}</T>
+            <T kind="num" style={{ width: 54, textAlign: 'right' }}>{l ? `${l.percentFull}%` : '—'}</T>
           </View>
         );
       })}
@@ -107,6 +108,7 @@ export function ParkingSheet({ onClose }) {
 /* ---------- Safety ---------- */
 export function SafetySheet({ onClose }) {
   const { t } = useTheme();
+  const { setSheet } = useApp();
   return (
     <Sheet title="Safety" hand="Numbers verified on Texas Tech Police's contact page" onClose={onClose} height={0.75}>
       <PostIt color="pink" tilt={-1} tape padding={18}>
@@ -121,7 +123,18 @@ export function SafetySheet({ onClose }) {
         <T kind="small" style={{ marginTop: 4 }}>Reports, suspicious activity, a welfare check, or a question for campus police.</T>
         <Button title="Call campus police" icon="phone" kind="ghost" onPress={() => call(SAFETY.campusPolice.phone)} style={{ marginTop: 12 }} small />
       </Card>
+      <Card style={{ marginTop: 14 }} onPress={() => { onClose(); setSheet({ type: 'safewalk' }); }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Icon name="shield" />
+          <View style={{ flex: 1, marginLeft: 10 }}>
+            <T kind="bold">Safe Walk</T>
+            <T kind="small">Pick friends to watch you get home. If you don't check in, they get a ping.</T>
+          </View>
+          <Icon name="chevronRight" color={t.pencil} />
+        </View>
+      </Card>
       <Pressable onPress={() => openUrl(SAFETY.campusPolice.source)} style={{ marginTop: 14 }}><T kind="small" color={t.accent}>Source: depts.ttu.edu/ttpd/contact.php</T></Pressable>
+      <LastChecked date={CHECKED.safety} source="Texas Tech Police" itemId="safety:ttpd" title="Campus police number" url={SAFETY.campusPolice.source} />
     </Sheet>
   );
 }

@@ -12,7 +12,7 @@
  * just shows the user where they stand.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { View, ScrollView, TextInput, Pressable, ActivityIndicator, Image, Alert } from 'react-native';
+import { View, ScrollView, TextInput, Pressable, ActivityIndicator } from 'react-native';
 import { Sheet, T, PostIt, PT, Row, Chip } from '../ui/Paper';
 import Icon from '../ui/Icon';
 import { PlaneMark } from '../ui/Logo';
@@ -22,20 +22,17 @@ import { api } from '../lib/firebase';
 import { useWeather } from '../lib/hooks';
 import { isOpenNow } from '../lib/hours';
 import {
-  itemsOnDay, todayCode, toMinutes, sortByTime, dueLabel, metaLine, localDay,
+  itemsOnDay, todayCode, toMinutes, sortByTime, dueLabel, metaLine,
 } from '../lib/time';
 import {
-  BUILDINGS, ORGS, DINING, RESOURCES, buildingById, catLabel, walkLabel, walkMinsFor, nextGame, gameDateLabel,
+  BUILDINGS, ORGS, DINING, RESOURCES, buildingById, catLabel, walkLabel, nextGame, gameDateLabel,
 } from '../data/campus';
-import { useHere } from '../lib/here';
 import { openUrl } from '../lib/links';
 import { LIMITS, SAFETY } from '../config';
-import { ImagePicker } from '../lib/native';
-import { preparePhoto } from '../lib/photos';
 
 const SUGGESTIONS = [
   'Where is my next class?', "What's due this week?", "What's open to eat right now?",
-  "What's happening tonight?", 'Best study spots?', 'When is the next game?', 'Help me start an essay',
+  "What's happening tonight?", 'Where can I study late?', 'When is the next game?',
 ];
 
 const FIXED = [
@@ -67,39 +64,29 @@ function buildContext({ scheduleItems, assignments, weather, userMajor, userClas
 }
 
 export default function Pilot({ onClose }) {
-  const here = useHere();
   const { t } = useTheme();
   const app = useApp();
-  const { scheduleItems, assignments, savedEvents, goToBuilding, setSheet, setTab, pilotSeed, setPilotSeed, notePilotUse, isPlus, pilotUsedToday, pilotDay, schoolId, user, set } = app;
+  const { scheduleItems, assignments, savedEvents, goToBuilding, setSheet, setTab, pilotSeed, setPilotSeed, notePilotUse, isPlus, pilotUsedToday, pilotDay, schoolId } = app;
   const weather = useWeather(schoolId);
-  /* The server's count is the real one (it follows the account across
-     phones), so sync the "left today" number to it when Pilot opens. */
-  useEffect(() => {
-    if (!user) return;
-    api.getUsage({}).then((r) => { if (r?.data && typeof r.data.pilot === 'number') set({ pilotDay: localDay(), pilotUsedToday: r.data.pilot }); }).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
   const [input, setInput] = useState('');
   const [thread, setThread] = useState([]);
-  const [photo, setPhoto] = useState(null);
   const scroller = useRef(null);
-  const usedToday = pilotDay === localDay() ? pilotUsedToday : 0;
+  const usedToday = pilotDay === new Date().toISOString().slice(0, 10) ? pilotUsedToday : 0;
   const limit = isPlus ? LIMITS.pilotPlus : LIMITS.pilotFree;
 
   const local = (low) => {
     if (/(next|my) class|where.*class|what.*class|schedule today/.test(low)) {
       const nowM = new Date().getHours() * 60 + new Date().getMinutes();
-      const todays = sortByTime(itemsOnDay(scheduleItems, todayCode()));
-      const next = todays.find((i) => (toMinutes(i.endTime) ?? toMinutes(i.time) ?? 0) > nowM);
-      if (!next) return { text: todays.length || scheduleItems.some((i) => !i.oneOff) ? "You're done with classes for today." : "You haven't added any classes yet. Add them in the Planner and I'll know." };
+      const next = sortByTime(itemsOnDay(scheduleItems, todayCode())).find((i) => (toMinutes(i.endTime) ?? 0) > nowM);
+      if (!next) return { text: scheduleItems.length ? "You're done with classes for today." : "You haven't added any classes yet. Add them in the Planner and I'll know." };
       const b = buildingById(next.buildingId);
-      return { text: `${next.title} at ${next.time} in ${next.place || b?.name}.${walkMinsFor(b, here) ? ` About a ${walkMinsFor(b, here)}-minute walk from you.` : ''}`, buildingId: next.buildingId };
+      return { text: `${next.title} at ${next.time} in ${next.place || b?.name}.${b?.walk ? ` About a ${b.walk}-minute walk.` : ''}`, buildingId: next.buildingId };
     }
     if (/due|assignment|homework/.test(low)) {
       const due = assignments.filter((a) => !a.done && a.due).sort((a, b) => new Date(a.due) - new Date(b.due));
       const week = due.filter((a) => new Date(a.due) - new Date() < 7 * 86400000);
       if (!due.length) return { text: "Nothing in your planner is due. If that's wrong, add assignments in Planner → Due.", tab: 'schedule' };
-      return { text: week.length ? `You have ${week.length} due this week:\n${week.slice(0, 5).map((a) => `• ${a.title}${a.course ? ` (${a.course})` : ''}, ${dueLabel(a.due)}`).join('\n')}` : `Nothing this week. Next up: ${due[0].title}, ${dueLabel(due[0].due)}.`, tab: 'schedule' };
+      return { text: week.length ? `You have ${week.length} due this week:\n${week.slice(0, 5).map((a) => `• ${a.title}${a.course ? ` (${a.course})` : ''}: ${dueLabel(a.due)}`).join('\n')}` : `Nothing this week. Next up: ${due[0].title}, ${dueLabel(due[0].due)}.`, tab: 'schedule' };
     }
     if (/weather|rain|cold|hot|jacket|umbrella|outside/.test(low)) {
       if (weather.loading) return { text: 'Still checking the weather. Ask again in a sec.' };
@@ -107,7 +94,7 @@ export default function Pilot({ onClose }) {
       return { text: `It's ${weather.temp}° and ${weather.condition.toLowerCase()} in Lubbock. High ${weather.hi}°, low ${weather.lo}°.` };
     }
     if (/(eat|food|hungry|lunch|dinner|breakfast|coffee).*(open|now)|open.*(eat|food)|what.*open/.test(low)) {
-      const open = DINING.filter((d) => isOpenNow(d.hours) === true).sort((a, b) => (walkMinsFor(a, here) ?? 99) - (walkMinsFor(b, here) ?? 99));
+      const open = DINING.filter((d) => isOpenNow(d.hours) === true).sort((a, b) => (a.walk ?? 99) - (b.walk ?? 99));
       if (!open.length) return { text: 'None of the on-campus dining spots with posted hours are open right now.' };
       return { text: `${open.length} spots are open now. Closest:`, diningIds: open.slice(0, 4).map((d) => d.id) };
     }
@@ -116,51 +103,19 @@ export default function Pilot({ onClose }) {
       return { text: g ? `${g.homeAway === 'home' ? 'Home vs.' : 'Away at'} ${g.opponent}, ${gameDateLabel(g.kickoff)} at ${g.venue}.` : 'Football season is over.' };
     }
     if (/saved|bookmark/.test(low)) return { text: savedEvents.length ? `You have ${savedEvents.length} saved ${savedEvents.length === 1 ? 'event' : 'events'}. They're in You.` : 'Nothing saved yet.', tab: 'you' };
+    if (/study|quiet|library/.test(low)) return { text: 'Good study spots:', buildingIds: ['texas-tech-university-library', 'student-union'] };
     return null;
   };
 
-  /* Study spots: real ratings from students who checked in, when there
-     are enough of them; otherwise the two obvious places. */
-  const studySpots = async () => {
-    try {
-      const r = await api.getTopRated({ category: 'study' });
-      const top = (r.data.places || []).slice(0, 4);
-      if (top.length) return { text: `Top-rated study spots on Flyer (from students who checked in):\n${top.map((x) => `• ${x.name}: ${x.overall}★ (quiet ${x.quiet}, outlets ${x.outlets})`).join('\n')}`, buildingIds: top.map((x) => x.id) };
-    } catch (e) { /* fall through */ }
-    return { text: 'Not enough ratings yet to rank study spots. These are good bets. Get stamped there and rate them to help!', buildingIds: ['texas-tech-university-library', 'student-union'] };
-  };
-
-  const pickPhoto = () => {
-    if (!ImagePicker) { setThread((p) => [...p, { role: 'p', hit: { text: 'Photo questions need the full app build.' } }]); return; }
-    const go = async (camera) => {
-      const perm = camera ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!perm.granted) return;
-      const opts = { quality: 0.8, mediaTypes: ['images'] };
-      const res = camera ? await ImagePicker.launchCameraAsync(opts) : await ImagePicker.launchImageLibraryAsync(opts);
-      if (res.canceled || !res.assets?.[0]) return;
-      const a = await preparePhoto(res.assets[0], { base64: true }).catch(() => null);
-      if (!a || !a.base64) return;
-      setPhoto({ uri: a.uri, base64: a.base64, mediaType: a.mimeType });
-    };
-    Alert.alert('Ask about a photo', 'Notes, a worksheet or a whiteboard. Pilot explains it step by step.', [
-      { text: 'Take photo', onPress: () => go(true) },
-      { text: 'Choose photo', onPress: () => go(false) },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  };
-
   const ask = async (text) => {
-    const img = photo;
-    const q = (text || input).trim() || (img ? 'Help me understand this.' : '');
+    const q = (text || input).trim();
     if (!q) return;
     const low = q.toLowerCase();
     setInput('');
-    setPhoto(null);
-    setThread((p) => [...p, { role: 'u', text: q, uri: img?.uri }]);
-    if (!img && /study spot|where.*study|study late|quiet place|library/.test(low)) { const hit = await studySpots(); setThread((p) => [...p, { role: 'p', hit }]); return; }
-    const l = img ? null : local(low);
+    setThread((p) => [...p, { role: 'u', text: q }]);
+    const l = local(low);
     if (l) { setThread((p) => [...p, { role: 'p', hit: l }]); return; }
-    const fixed = img ? null : FIXED.find((r) => r.match.some((m) => low.includes(m)));
+    const fixed = FIXED.find((r) => r.match.some((m) => low.includes(m)));
     if (fixed) { setThread((p) => [...p, { role: 'p', hit: fixed }]); return; }
     if (usedToday >= limit) {
       setThread((p) => [...p, { role: 'p', hit: { text: isPlus ? "You've hit today's question limit. It resets at midnight." : `That's all ${limit} free questions for today. They reset at midnight, or Flyer Plus gives you ${LIMITS.pilotPlus} a day.`, plus: !isPlus } }]);
@@ -169,11 +124,7 @@ export default function Pilot({ onClose }) {
     const id = `pending-${Date.now()}`;
     setThread((p) => [...p, { role: 'p', pending: true, id }]);
     try {
-      const res = await api.askPilot({
-        question: q, context: buildContext({ ...app, weather }),
-        history: thread.slice(-6).filter((m) => !m.pending).map((m) => ({ role: m.role === 'u' ? 'user' : 'assistant', text: m.text || m.hit?.text || '' })),
-        image: img ? { base64: img.base64, mediaType: img.mediaType } : undefined,
-      });
+      const res = await api.askPilot({ question: q, context: buildContext({ ...app, weather }), history: thread.slice(-6).filter((m) => !m.pending).map((m) => ({ role: m.role === 'u' ? 'user' : 'assistant', text: m.text || m.hit?.text || '' })) });
       notePilotUse();
       const reply = (res?.data?.text || '').trim() || "I don't have verified information on that.";
       setThread((p) => p.map((m) => (m.id === id ? { role: 'p', hit: { text: reply, sources: res?.data?.sources || [] } } : m)));
@@ -191,40 +142,26 @@ export default function Pilot({ onClose }) {
       headerRight={<View style={{ marginRight: 4 }}><PlaneMark size={34} trail={false} /></View>}
       footer={(
         <View>
-          {photo ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-              <Image source={{ uri: photo.uri }} style={{ width: 54, height: 54, borderRadius: 8, borderWidth: 1.5, borderColor: '#1F2A44' }} />
-              <T kind="small" style={{ flex: 1, marginLeft: 10 }}>Photo attached. Ask about it, or just send.</T>
-              <Pressable onPress={() => setPhoto(null)} hitSlop={10} accessibilityLabel="Remove photo"><Icon name="close" color={t.ink} /></Pressable>
-            </View>
-          ) : null}
-          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: t.card, borderWidth: 2, borderColor: t.mode === 'dark' ? t.borderStrong : '#1F2A44', borderRadius: 16, paddingLeft: 6, paddingRight: 6, paddingVertical: 6 }}>
-            <Pressable onPress={pickPhoto} accessibilityLabel="Ask about a photo" style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginRight: 6 }}>
-              <Icon name="camera" size={20} color={t.ink} />
-            </Pressable>
-            <TextInput style={{ flex: 1, fontSize: 16, color: t.ink, paddingVertical: 6 }} placeholder={photo ? 'What do you want to know?' : 'Ask Pilot…'} placeholderTextColor={t.faint} value={input} onChangeText={setInput} onSubmitEditing={() => ask()} returnKeyType="send" maxLength={1800} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: t.card, borderWidth: 2, borderColor: t.mode === 'dark' ? t.borderStrong : '#1F2A44', borderRadius: 16, paddingLeft: 14, paddingRight: 6, paddingVertical: 6 }}>
+            <TextInput style={{ flex: 1, fontSize: 16, color: t.ink, paddingVertical: 6 }} placeholder="Ask Pilot…" placeholderTextColor={t.faint} value={input} onChangeText={setInput} onSubmitEditing={() => ask()} returnKeyType="send" maxLength={500} />
             <Pressable onPress={() => ask()} accessibilityLabel="Send" style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: t.highlight, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#1F2A44' }}>
               <Icon name="send" size={18} color="#1F2A44" />
             </Pressable>
           </View>
-          <T kind="small" style={{ fontSize: 11, marginTop: 6, textAlign: 'center' }}>{Math.max(0, limit - usedToday)} live answers left today · Homework help walks you through it step by step · Pilot can be wrong.</T>
+          <T kind="small" style={{ fontSize: 11, marginTop: 6, textAlign: 'center' }}>{Math.max(0, limit - usedToday)} live answers left today · Pilot can be wrong. Check official sources for deadlines.</T>
         </View>
       )}>
-      <ScrollView ref={scroller} style={{ height: 420, flexShrink: 1 }} onLayout={() => scroller.current?.scrollToEnd({ animated: false })} contentContainerStyle={{ paddingBottom: 10 }} keyboardShouldPersistTaps="handled">
+      <ScrollView ref={scroller} style={{ height: 420 }} contentContainerStyle={{ paddingBottom: 10 }} keyboardShouldPersistTaps="handled">
         {!thread.length ? (
           <View>
             <T kind="hand" style={{ marginBottom: 8 }}>try one of these:</T>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-              <Chip label="Snap a homework problem" icon="camera" onPress={pickPhoto} />
               {SUGGESTIONS.map((s) => <Chip key={s} label={s} onPress={() => ask(s)} />)}
             </View>
           </View>
         ) : thread.map((m, i) => (m.role === 'u' ? (
-          <View key={i} style={{ alignSelf: 'flex-end', maxWidth: '82%', marginBottom: 10, alignItems: 'flex-end' }}>
-            {m.uri ? <Image source={{ uri: m.uri }} style={{ width: 160, height: 160, borderRadius: 10, marginBottom: 4 }} /> : null}
-            <View style={{ backgroundColor: t.accent, borderRadius: 14, borderBottomRightRadius: 4, paddingHorizontal: 12, paddingVertical: 8 }}>
-              <T color={t.accentInk}>{m.text}</T>
-            </View>
+          <View key={i} style={{ alignSelf: 'flex-end', maxWidth: '82%', backgroundColor: t.accent, borderRadius: 14, borderBottomRightRadius: 4, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 10 }}>
+            <T color={t.accentInk}>{m.text}</T>
           </View>
         ) : m.pending ? (
           <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
@@ -237,8 +174,8 @@ export default function Pilot({ onClose }) {
             </PostIt>
             <View style={{ marginTop: 6 }}>
               {m.hit.buildingId ? <Row title={buildingById(m.hit.buildingId)?.name} meta="Show on map" onPress={() => { onClose(); goToBuilding(m.hit.buildingId); }} /> : null}
-              {(m.hit.buildingIds || []).map((id) => { const b = buildingById(id); return b ? <Row key={id} title={b.name} meta={metaLine(catLabel(b.kind), walkLabel(b, here))} onPress={() => { onClose(); goToBuilding(id); }} /> : null; })}
-              {(m.hit.diningIds || []).map((id) => { const d = DINING.find((x) => x.id === id); return d ? <Row key={id} title={d.name} meta={metaLine(d.venue, walkLabel(d, here) || null)} onPress={() => { onClose(); setSheet({ type: 'dining', id }); }} /> : null; })}
+              {(m.hit.buildingIds || []).map((id) => { const b = buildingById(id); return b ? <Row key={id} title={b.name} meta={metaLine(catLabel(b.kind), walkLabel(b))} onPress={() => { onClose(); goToBuilding(id); }} /> : null; })}
+              {(m.hit.diningIds || []).map((id) => { const d = DINING.find((x) => x.id === id); return d ? <Row key={id} title={d.name} meta={metaLine(d.venue, d.walk ? `${d.walk} min walk` : null)} onPress={() => { onClose(); setSheet({ type: 'dining', id }); }} /> : null; })}
               {(m.hit.resourceIds || []).map((id) => { const r = RESOURCES.find((x) => x.id === id); return r ? <Row key={id} title={r.name} meta={r.kind} onPress={() => (r.url ? openUrl(r.url) : (onClose(), goToBuilding(r.buildingId)))} /> : null; })}
               {(m.hit.sources || []).slice(0, 3).map((s) => <Row key={s.url} title={s.title || s.url} meta="Source" onPress={() => openUrl(s.url)} />)}
               {m.hit.tab ? <Row title={m.hit.tab === 'schedule' ? 'Open Planner' : 'Open You'} onPress={() => { onClose(); setTab(m.hit.tab); }} /> : null}

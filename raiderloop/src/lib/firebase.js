@@ -1,30 +1,34 @@
 /**
- * Firebase — app, auth, Firestore, Storage, and callable functions.
+ * Firebase — app, auth, Firestore, Storage uploads, and callable
+ * functions.
  * ------------------------------------------------------------
- * Every callable requires a signed-in user (a guest is an
- * anonymous Firebase user). That one change is what lets the server
- * rate-limit per person and stops random scripts from spending your
+ * Every callable requires a signed-in user (a guest is an anonymous
+ * Firebase user). That one change is what lets the server rate-limit
+ * per person and stops random scripts from spending your
  * Anthropic/Tavily credits by hitting the endpoints directly.
+ *
+ * Uploads only ever go to uploads/{uid}/…; a function checks and
+ * moderates each one before anyone else can see it (storage.rules).
  *
  * Deliberately does NOT import firebase/analytics: it depends on
  * browser-only APIs and crashes on a real device.
  */
+import { Platform } from 'react-native';
 import { initializeApp, getApps } from 'firebase/app';
 import {
-  initializeAuth, getAuth, onAuthStateChanged, onIdTokenChanged, signInAnonymously,
+  initializeAuth, getAuth, onAuthStateChanged, signInAnonymously,
   createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut as fbSignOut,
   sendPasswordResetEmail, updateProfile, OAuthProvider, signInWithCredential,
-  linkWithCredential, EmailAuthProvider,
-  reauthenticateWithCredential, revokeAccessToken,
+  linkWithCredential, EmailAuthProvider, deleteUser,
 } from 'firebase/auth';
 import * as FirebaseAuth from 'firebase/auth';
 import {
-  getFirestore, doc, onSnapshot, collection, query, where, orderBy, limit, getDoc,
+  getFirestore, doc, onSnapshot, collection, query, where, orderBy, limit,
 } from 'firebase/firestore';
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { getStorage, ref as storageRef, uploadBytes } from 'firebase/storage';
 import { FIREBASE_CONFIG } from '../config';
-import { AsyncStorage } from './native';
+import { AsyncStorage, Constants } from './native';
 
 export const app = getApps().length ? getApps()[0] : initializeApp(FIREBASE_CONFIG);
 
@@ -42,115 +46,75 @@ function makeAuth() {
 }
 export const auth = makeAuth();
 export const db = getFirestore(app);
-export const storage = getStorage(app);
 const functions = getFunctions(app);
+const storage = getStorage(app);
 
-/* Wait for the saved sign-in to load before calling the server. This
-   matters most for background tasks (nearby alerts): without it, a
-   cold start could look signed out and create a brand-new guest. */
-async function authReady() {
-  if (auth.authStateReady) { await auth.authStateReady(); return; }
-  await new Promise((resolve) => { const off = onAuthStateChanged(auth, () => { off(); resolve(); }); });
-}
-
-const call = (name, { guestOk = true, timeout = 95000 } = {}) => {
-  const fn = httpsCallable(functions, name, { timeout });
-  return async (data) => {
-    await authReady();
-    if (!auth.currentUser) {
-      if (!guestOk) throw new Error('Sign in first.');
-      await signInAnonymously(auth);
-    }
+const call = (name) => {
+  const fn = httpsCallable(functions, name, { timeout: 120000 });
+  const wrapped = async (data) => {
+    if (!auth.currentUser) await signInAnonymously(auth);
     return fn(data);
   };
-};
-/* Functions that only make sense for a real account never create a
-   guest on the way in. */
-const acct = (name) => call(name, { guestOk: false });
-
-export const api = {
-  askPilot: call('askPilot', { timeout: 160000 }),
-  parseSchedule: call('parseSchedule'),
-  parseSyllabus: call('parseSyllabus', { timeout: 250000 }),
-  getEvents: call('getEvents'),
-  getNews: call('getNews'),
-  getSportsSchedule: call('getSportsSchedule'),
-  getDiningMenus: call('getDiningMenus'),
-  getCampusAlerts: call('getCampusAlerts'),
-  enrichOrg: call('enrichOrg'),
-  getVenueImage: call('getVenueImage'),
-  getDiningHallDetail: call('getDiningHallDetail'),
-  getParking: call('getParking'),
-  getFinals: call('getFinals'),
-  requestSchool: call('requestSchool'),
-  getSponsors: call('getSponsors'),
-  getUsage: call('getUsage'),
-  getTopRated: call('getTopRated'),
-  deleteAccount: call('deleteAccount'),
-  stopSharing: call('stopSharing'),
-  // account-only
-  saveProfile: acct('saveProfile'),
-  sendFriendRequest: acct('sendFriendRequest'),
-  searchPeople: acct('searchPeople'),
-  setHandle: acct('setHandle'),
-  checkName: call('checkName'),
-  respondFriendRequest: acct('respondFriendRequest'),
-  removeFriend: acct('removeFriend'),
-  blockUser: acct('blockUser'),
-  createFriendCode: acct('createFriendCode'),
-  redeemFriendCode: acct('redeemFriendCode'),
-  resetFriendCodes: acct('resetFriendCodes'),
-  updateLocation: acct('updateLocation'),
-  reportContent: acct('reportContent'),
-  checkIn: acct('checkIn'),
-  setFlightPrefs: acct('setFlightPrefs'),
-  getFlightBoard: acct('getFlightBoard'),
-  rateBuilding: acct('rateBuilding'),
-  openDm: acct('openDm'),
-  sendMessage: acct('sendMessage'),
-  createFlock: acct('createFlock'),
-  addFlockMembers: acct('addFlockMembers'),
-  removeFlockMember: acct('removeFlockMember'),
-  leaveFlock: acct('leaveFlock'),
-  renameFlock: acct('renameFlock'),
-  deleteFlock: acct('deleteFlock'),
-  savePushToken: acct('savePushToken'),
-  removePushToken: call('removePushToken', { guestOk: false }),
-  setChatMute: acct('setChatMute'),
-  createMeetup: acct('createMeetup'),
-  respondMeetup: acct('respondMeetup'),
-  cancelMeetup: acct('cancelMeetup'),
-  meetupCheckIn: acct('meetupCheckIn'),
-  autoCheckIn: acct('autoCheckIn'),
-  updateScheduleShare: acct('updateScheduleShare'),
-  setNearbyPrefs: acct('setNearbyPrefs'),
-  nearbyPing: acct('nearbyPing'),
-  exportMyData: acct('exportMyData'),
+  wrapped.callableName = name; // lets useCallable keep an offline copy
+  return wrapped;
 };
 
-/* Friendly text for a failed callable. */
-export const errText = (e, fallback = 'Something went wrong. Try again.') => {
-  const msg = e && e.message ? String(e.message).replace(/^.*?\): /, '') : '';
-  if (!msg || /internal|INTERNAL/.test(msg)) return fallback;
-  return msg;
-};
+const NAMES = [
+  // 1.x
+  'askPilot', 'parseSchedule', 'getEvents', 'getNews', 'getSportsSchedule', 'getDiningMenus', 'getCampusAlerts', 'enrichOrg',
+  'getVenueImage', 'getDiningHallDetail', 'getParking', 'getFinals', 'requestSchool', 'saveProfile', 'sendFriendRequest',
+  'respondFriendRequest', 'removeFriend', 'blockUser', 'updateLocation', 'stopSharing', 'setClassmateOptIn', 'findClassmates',
+  'getSponsors', 'canvasExchange', 'canvasSync', 'canvasDisconnect', 'getUsage', 'deleteAccount',
+  // Campus hub
+  'getJobs', 'getCourse', 'getDeals', 'voteDeal', 'suggestDeal',
+  // Connect
+  'savePushToken', 'saveCard', 'getCard', 'setFacePhoto', 'walletLink', 'setSayHi', 'getSayHi', 'sendSayHi', 'respondSayHi',
+  'faceSwap', 'faceSwapStatus', 'dropBeacon', 'dropSend', 'dropClaim', 'dropDismiss', 'createShare', 'getShare', 'report',
+  'amIAdmin', 'adminQueue', 'adminAction', 'claimOrg', 'myOrgs', 'reportOutdated', 'myData', 'deleteMyData',
+  // Posts + places
+  'createPost', 'savePost', 'deletePost', 'getStory', 'setPrivacyPrefs', 'createPublicPost', 'deletePublicPost', 'markHelpful',
+  'setGoing', 'tapStatus', 'shareNotes', 'getClassNotes', 'askNotes',
+  // Together
+  'groupCreate', 'groupJoin', 'groupLeave', 'groupAction', 'planCreate', 'planVote', 'planClose', 'queueOpen', 'queueJoin',
+  'queueLeave', 'queueNext', 'queueClose', 'presentClaim', 'presentShow', 'presentNav', 'presentEnd', 'walkStart', 'walkUpdate',
+  'walkCheckIn', 'walkEnd', 'walkSOS',
+  // Play
+  'getPlay', 'setLeaderboard', 'getLeaderboard', 'checkIn', 'gameCreate', 'gameJoin', 'gameStart', 'gameMyCode', 'gamePing',
+  'gameHint', 'gameFound', 'gameEnd',
+  // Tools
+  'scanFlyer', 'parseSyllabus', 'getDegreePlan', 'getMajor', 'getAround', 'canvaExchange', 'canvaDesigns', 'canvaDisconnect',
+  'smsStart', 'smsConfirm', 'smsDisconnect', 'saveSmsContext',
+];
+export const api = Object.fromEntries(NAMES.map((n) => [n, call(n)]));
 
-/* Asks the server whether a first name is allowed (the server owns the
-   list, so the app and the server can never disagree). Returns a message
-   to show, or null when the name is fine. If the server can't be reached
-   it returns null: saving the profile checks again, so nothing slips by. */
-export async function nameProblem(name) {
-  const n = String(name || '').trim();
-  if (!n) return null;
-  try { await api.checkName({ name: n }); return null; } catch (e) {
-    return /invalid-argument/.test(String(e?.code || '')) ? errText(e, "That name isn't allowed on Flyer.") : null;
-  }
+/* Logging never signs anyone in, so a failed sign-in can still be
+   recorded for debugging (it's how App Review problems get found). */
+const logFn = httpsCallable(functions, 'logClientError');
+export function logClientError(where, e) {
+  const version = Constants?.expoConfig?.version || '';
+  logFn({
+    where, code: String(e?.code || ''), message: String(e?.message || e || '').slice(0, 500),
+    platform: Platform.OS, os: String(Platform.Version || ''), app: version,
+  }).catch(() => {});
+}
+
+/* ---------- uploads ---------- */
+const rid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+/** Uploads a local file (photo or PDF) to uploads/{uid}/… and returns
+    the storage path a function will check and publish. */
+export async function uploadLocalFile(uri, contentType = 'image/jpeg') {
+  if (!auth.currentUser) await signInAnonymously(auth);
+  const uid = auth.currentUser.uid;
+  const ext = contentType === 'application/pdf' ? 'pdf' : contentType === 'image/png' ? 'png' : 'jpg';
+  const path = `uploads/${uid}/${rid()}.${ext}`;
+  const res = await fetch(uri);
+  const blob = await res.blob();
+  await uploadBytes(storageRef(storage, path), blob, { contentType });
+  return path;
 }
 
 /* ---------- auth helpers ---------- */
-/* onIdTokenChanged (not onAuthStateChanged) so upgrading a guest to a
-   real account, which keeps the same uid, is noticed too. */
-export const onAuth = (cb) => onIdTokenChanged(auth, cb);
+export const onAuth = (cb) => onAuthStateChanged(auth, cb);
 export const guestSignIn = () => signInAnonymously(auth);
 
 /* If someone started as a guest, creating an account LINKS to the
@@ -170,78 +134,68 @@ export const emailSignIn = (email, password) => signInWithEmailAndPassword(auth,
 export const resetPassword = (email) => sendPasswordResetEmail(auth, email);
 export const signOut = () => fbSignOut(auth);
 
+/* Plain-English messages for Sign in with Apple, so nobody (App
+   Review included) ever sees a raw error code. */
+export function appleErrorMessage(e) {
+  const c = String(e?.code || '');
+  if (/ERR_REQUEST_CANCELED|ERR_CANCELED|canceled/i.test(c)) return null;
+  if (c.includes('operation-not-allowed')) return "Apple sign-in isn't available for Flyer right now. Use email, or tap \"Look around first\".";
+  if (c.includes('network')) return "Can't reach the server. Check your connection and try again.";
+  if (c.includes('invalid-credential') || c.includes('missing-or-invalid-nonce')) return "Apple couldn't confirm the sign-in. Please try again.";
+  if (c.includes('account-exists-with-different-credential')) return 'That email already has a Flyer account. Sign in with email instead.';
+  if (c.includes('ERR_REQUEST_NOT_HANDLED') || c.includes('ERR_REQUEST_NOT_INTERACTIVE') || c.includes('ERR_REQUEST_UNKNOWN')) return 'Apple sign-in was interrupted. Try again, or use email.';
+  if (c.includes('ERR_INVALID_RESPONSE') || c.includes('no-token')) return "Apple didn't send back a sign-in. Try again, or use email.";
+  return 'Apple sign-in didn\'t work this time. Try again, or use email.';
+}
+
 /* Sign in with Apple → Firebase. The nonce dance is required:
-   Apple signs the SHA-256 of the nonce, Firebase checks the raw one. */
-async function appleCredential(AppleAuth, Crypto) {
-  const raw = Math.random().toString(36).slice(2) + Date.now().toString(36);
+   Apple signs the SHA-256 of the nonce, Firebase checks the raw one.
+   If this phone was a guest, the Apple account is LINKED to the same
+   user; if that Apple ID already has a Flyer account, we sign into it
+   with the credential Firebase hands back (a nonce can't be reused). */
+export async function appleSignIn(AppleAuth, Crypto) {
+  let raw;
+  try {
+    const bytes = Crypto.getRandomBytes ? Crypto.getRandomBytes(32) : null;
+    raw = bytes ? Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('') : null;
+  } catch (e) { raw = null; }
+  if (!raw) raw = `${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
   const hashed = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, raw);
   const res = await AppleAuth.signInAsync({
     requestedScopes: [AppleAuth.AppleAuthenticationScope.FULL_NAME, AppleAuth.AppleAuthenticationScope.EMAIL],
     nonce: hashed,
   });
+  if (!res || !res.identityToken) { const err = new Error('Apple returned no identity token'); err.code = 'no-token'; throw err; }
   const provider = new OAuthProvider('apple.com');
-  return { res, credential: provider.credential({ idToken: res.identityToken, rawNonce: raw }) };
-}
-
-export async function appleSignIn(AppleAuth, Crypto) {
-  const { res, credential } = await appleCredential(AppleAuth, Crypto);
+  const credential = provider.credential({ idToken: res.identityToken, rawNonce: raw });
   const cur = auth.currentUser;
   let result;
-  if (cur && cur.isAnonymous) {
-    try {
-      result = await linkWithCredential(cur, credential);
-    } catch (e) {
-      // This Apple ID already has a Flyer account: sign in to it. Any
-      // other error (network, cancelled) is passed up, not swallowed.
-      if (e?.code !== 'auth/credential-already-in-use') throw e;
-      const existing = OAuthProvider.credentialFromError(e);
-      if (!existing) throw e;
-      result = await signInWithCredential(auth, existing);
+  try {
+    if (cur && cur.isAnonymous) {
+      try {
+        result = await linkWithCredential(cur, credential);
+      } catch (e) {
+        const code = String(e?.code || '');
+        if (code.includes('credential-already-in-use') || code.includes('email-already-in-use') || code.includes('provider-already-linked')) {
+          const again = OAuthProvider.credentialFromError ? OAuthProvider.credentialFromError(e) : null;
+          result = await signInWithCredential(auth, again || credential);
+        } else throw e;
+      }
+    } else {
+      result = await signInWithCredential(auth, credential);
     }
-  } else {
-    result = await signInWithCredential(auth, credential);
+  } catch (e) {
+    logClientError('appleSignIn', e);
+    throw e;
   }
   const name = [res.fullName?.givenName, res.fullName?.familyName].filter(Boolean).join(' ');
   if (name && !result.user.displayName) await updateProfile(result.user, { displayName: name }).catch(() => {});
-  return { user: result.user, name, switched: !!cur && cur.uid !== result.user.uid };
+  return { user: result.user, name: name || result.user.displayName || '' };
 }
 
-export const isAppleUser = () => !!auth.currentUser?.providerData?.some((p) => p.providerId === 'apple.com');
-
-/* Apple requires apps that offer Sign in with Apple to revoke the
-   Apple token when the account is deleted. That needs one fresh
-   Apple sign-in to get an authorization code. */
-export async function revokeApple(AppleAuth, Crypto) {
-  const { res, credential } = await appleCredential(AppleAuth, Crypto);
-  if (auth.currentUser) await reauthenticateWithCredential(auth.currentUser, credential).catch(() => {});
-  if (res.authorizationCode) await revokeAccessToken(auth, res.authorizationCode);
-}
-
-/* Everything server-side (data and sign-in) is deleted by the
-   deleteAccount function using the Admin SDK. */
 export async function deleteMyAccount() {
-  await api.deleteAccount({});
-}
-
-
-/* ---------- Photos ----------
-   Uploads a picked photo to chatImages/{chatId}/{myUid}/…, then the
-   sendMessage function checks it before anyone can see it. */
-export async function uploadChatPhoto(chatId, uri) {
-  const me = auth.currentUser?.uid;
-  if (!me) throw new Error('Sign in first.');
-  const blob = await (await fetch(uri)).blob();
-  if (blob.size > 6 * 1024 * 1024) throw new Error('That photo is too big.');
-  const path = `chatImages/${chatId}/${me}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
-  await uploadBytes(storageRef(storage, path), blob, { contentType: blob.type && blob.type.startsWith('image/') ? blob.type : 'image/jpeg' });
-  return path;
-}
-const urlCache = new Map();
-export async function photoUrl(path) {
-  if (urlCache.has(path)) return urlCache.get(path);
-  const url = await getDownloadURL(storageRef(storage, path));
-  urlCache.set(path, url);
-  return url;
+  await api.deleteAccount({}).catch(() => {});
+  if (auth.currentUser) await deleteUser(auth.currentUser).catch(() => {});
 }
 
 /* ---------- Firestore live listeners ---------- */
@@ -249,24 +203,8 @@ const docs = (s) => s.docs.map((d) => ({ id: d.id, ...d.data() }));
 export function listenMyProfile(uid, cb) {
   return onSnapshot(doc(db, 'users', uid), (s) => cb(s.exists() ? s.data() : null), () => cb(null));
 }
-/* One-time read of my server profile (null if there isn't one yet or
-   it can't be reached). Used to recognise a returning account. */
-export function getMyProfile(uid, timeoutMs = 8000) {
-  return new Promise((resolve) => {
-    let done = false; let off = () => {};
-    const finish = (v) => { if (done) return; done = true; clearTimeout(timer); try { off(); } catch (e) { /* already closed */ } resolve(v); };
-    const timer = setTimeout(() => finish(null), timeoutMs);
-    off = onSnapshot(doc(db, 'users', uid), (s) => {
-      // A "doesn't exist" answer from the offline cache isn't trustworthy; wait for the server.
-      if (!s.exists() && s.metadata.fromCache) return;
-      finish(s.exists() ? s.data() : null);
-    }, () => finish(null));
-    if (done) off();
-  });
-}
 export function listenFriends(uid, cb) {
-  // Second argument: true once the list really loaded (not an error).
-  return onSnapshot(collection(db, 'users', uid, 'friends'), (s) => cb(s.docs.map((d) => ({ uid: d.id, ...d.data() })), true), () => cb([], false));
+  return onSnapshot(collection(db, 'users', uid, 'friends'), (s) => cb(s.docs.map((d) => ({ uid: d.id, ...d.data() }))), () => cb([]));
 }
 export function listenRequests(uid, cb) {
   return onSnapshot(collection(db, 'users', uid, 'requests'), (s) => cb(s.docs.map((d) => ({ uid: d.id, ...d.data() }))), () => cb([]));
@@ -280,34 +218,59 @@ export function listenFriendLocations(uid, cb) {
   const q = query(collection(db, 'locations'), where('allowed', 'array-contains', uid));
   return onSnapshot(q, (s) => cb(s.docs.map((d) => ({ uid: d.id, ...d.data() }))), () => cb([]));
 }
-export function listenFlight(uid, cb) {
-  return onSnapshot(doc(db, 'flight', uid), (s) => cb(s.exists() ? s.data() : {}), () => cb({}));
+export function listenIntros(uid, cb) {
+  return onSnapshot(collection(db, 'users', uid, 'intros'), (s) => cb(s.docs.map((d) => ({ uid: d.id, ...d.data() }))), () => cb([]));
 }
-export function listenMeetups(uid, cb) {
-  const q = query(collection(db, 'meetups'), where('members', 'array-contains', uid), where('atMs', '>=', Date.now() - 6 * 3600000), orderBy('atMs', 'asc'), limit(30));
+export function listenFeed(uid, cb) {
+  return onSnapshot(collection(db, 'users', uid, 'feed'), (s) => cb(docs(s)), () => cb([]));
+}
+export function listenFriendPostcards(uid, cb) {
+  return onSnapshot(collection(db, 'users', uid, 'postcards'), (s) => cb(docs(s)), () => cb([]));
+}
+export function listenMyPosts(uid, cb) {
+  const q = query(collection(db, 'posts'), where('uid', '==', uid), orderBy('createdMs', 'desc'), limit(300));
   return onSnapshot(q, (s) => cb(docs(s)), () => cb([]));
 }
-export function listenChats(uid, cb) {
-  const q = query(collection(db, 'chats'), where('members', 'array-contains', uid), orderBy('updatedMs', 'desc'), limit(60));
+export function listenMyCard(uid, cb) {
+  return onSnapshot(doc(db, 'cards', uid), (s) => cb(s.exists() ? s.data() : null), () => cb(null));
+}
+export function listenDrops(uid, cb) {
+  const q = query(collection(db, 'drops'), where('recipients', 'array-contains', uid), orderBy('createdAt', 'desc'), limit(40));
   return onSnapshot(q, (s) => cb(docs(s)), () => cb([]));
 }
-export function listenMessages(chatId, cb, n = 80) {
-  const q = query(collection(db, 'chats', chatId, 'messages'), orderBy('atMs', 'desc'), limit(n));
-  return onSnapshot(q, (s) => cb(docs(s).reverse()), () => cb([]));
+export function listenGroups(uid, cb) {
+  return onSnapshot(query(collection(db, 'groups'), where('members', 'array-contains', uid)), (s) => cb(docs(s)), () => cb([]));
 }
-export function listenPlaceRating(placeId, cb) {
-  return onSnapshot(doc(db, 'placeRatings', placeId), (s) => cb(s.exists() ? s.data() : null), () => cb(null));
+export function listenGroupInvites(uid, cb) {
+  return onSnapshot(query(collection(db, 'groups'), where('invited', 'array-contains', uid)), (s) => cb(docs(s)), () => cb([]));
 }
-/* A friend's shared schedule: busy blocks always (if they share at
-   all), class details only if they chose "full" for me. Rules make a
-   "busy" reader's request for the full doc fail, which reads as null. */
-export async function getFriendSchedule(friendUid) {
-  const [a, b] = await Promise.all([
-    getDoc(doc(db, 'schedules', friendUid)).catch(() => null),
-    getDoc(doc(db, 'schedulesFull', friendUid)).catch(() => null),
-  ]);
-  return {
-    busy: a && a.exists() ? a.data().busy || [] : null,
-    classes: b && b.exists() ? b.data().classes || [] : null,
-  };
+export function listenWatching(uid, cb) {
+  return onSnapshot(query(collection(db, 'walks'), where('watchers', 'array-contains', uid)), (s) => cb(docs(s).filter((w) => ['active', 'overdue', 'sos'].includes(w.status))), () => cb([]));
+}
+export function listenDoc(path, cb) {
+  return onSnapshot(doc(db, ...path.split('/')), (s) => cb(s.exists() ? { id: s.id, ...s.data() } : null), () => cb(null));
+}
+export function listenScore(uid, cb) {
+  return onSnapshot(doc(db, 'scores', uid), (s) => cb(s.exists() ? s.data() : null), () => cb(null));
+}
+export function listenPublic(kind, cb, max = 60) {
+  const order = kind === 'event' ? orderBy('when', 'asc') : kind === 'tip' ? orderBy('helpful', 'desc') : orderBy('createdMs', 'desc');
+  const q = query(collection(db, 'publicPosts'), where('kind', '==', kind), where('status', '==', 'live'), order, limit(max));
+  return onSnapshot(q, (s) => cb(docs(s).filter((p) => !p.expiresAt || new Date(p.expiresAt) > new Date())), () => cb([]));
+}
+/** Places with a status tap in the last 30 minutes (map layer). */
+export function listenRecentStatus(cb) {
+  const q = query(collection(db, 'status'), where('updatedMs', '>', Date.now() - 30 * 60000), limit(80));
+  return onSnapshot(q, (s) => cb(docs(s)), () => cb([]));
+}
+export function listenMyPublic(uid, cb) {
+  return onSnapshot(query(collection(db, 'publicPosts'), where('uid', '==', uid)), (s) => cb(docs(s)), () => cb([]));
+}
+export function listenQueueEntries(code, cb) {
+  return onSnapshot(collection(db, 'queues', code, 'entries'), (s) => cb(docs(s)), () => cb([]));
+}
+export function listenGames(uid, cb) {
+  const a = onSnapshot(query(collection(db, 'games'), where('players', 'array-contains', uid)), (s) => cb('players', docs(s)), () => cb('players', []));
+  const b = onSnapshot(query(collection(db, 'games'), where('invited', 'array-contains', uid)), (s) => cb('invited', docs(s)), () => cb('invited', []));
+  return () => { a(); b(); };
 }

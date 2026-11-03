@@ -22,6 +22,8 @@ const notebook = {
   mode: 'light',
   paper: '#FBF7EC',
   paperDeep: '#F3EBD8',
+  kraft: '#EADCC2', // You tab: a kraft-paper folder
+  graphLine: 'rgba(47,93,168,0.10)',
   card: '#FFFDF7',
   rule: '#CFE0F2',
   margin: '#F2B3AD',
@@ -61,6 +63,8 @@ const chalkboard = {
   mode: 'dark',
   paper: '#1E2A25',
   paperDeep: '#17201C',
+  kraft: '#232B27',
+  graphLine: 'rgba(255,255,255,0.05)',
   card: '#26342E',
   rule: 'rgba(255,255,255,0.045)',
   margin: 'rgba(255,138,128,0.22)',

@@ -1,0 +1,155 @@
+{
+  "expo": {
+    "name": "Flyer",
+    "slug": "flyer",
+    "version": "2.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "scheme": "flyer",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FBF7EC",
+      "dark": {
+        "image": "./assets/splash-icon.png",
+        "backgroundColor": "#1E2A25"
+      }
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.joshuat8808.flyer",
+      "usesAppleSignIn": true,
+      "entitlements": {
+        "com.apple.security.application-groups": [
+          "group.com.joshuat8808.flyer"
+        ]
+      },
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Flyer reads only the photo you pick: a schedule screenshot to add your classes, or a photo to ask Pilot about or send to a friend.",
+        "NSLocationWhenInUseUsageDescription": "Flyer uses your location while the app is open to sort nearby places by walking time, to check you in at campus spots when you tap \"I'm here\", and, only if you turn it on, to share where you are with friends you choose.",
+        "NSCalendarsUsageDescription": "Flyer adds your classes and due dates to a separate Flyer calendar when you tap Export.",
+        "NSCalendarsFullAccessUsageDescription": "Flyer adds your classes and due dates to a separate Flyer calendar when you tap Export, and replaces them when you export again.",
+        "NSUserTrackingUsageDescription": "This lets ads in Flyer be more relevant. Saying no is fine: you'll still see ads, just less relevant ones. Your schedule, location, and friends are never shared with advertisers.",
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Only if you turn on Nearby alerts: Flyer checks your rough location in the background, on campus only, to tell you when a friend who also turned it on is close by. Friends never see where you are. Turn it off any time in Friends → Sharing.",
+        "NSCameraUsageDescription": "Flyer uses the camera to scan a friend's QR code, and to take a photo you choose to send to Pilot or a friend.",
+        "UIBackgroundModes": [
+          "location"
+        ]
+      }
+    },
+    "android": {
+      "package": "com.joshuat8808.flyer",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#2F5DA8"
+      },
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.RECORD_AUDIO",
+        "com.google.android.gms.permission.AD_ID"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-font",
+      "expo-web-browser",
+      "expo-apple-authentication",
+      [
+        "expo-notifications",
+        {
+          "color": "#2F5DA8"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Flyer uses your location while the app is open to sort nearby places by walking time, to check you in at campus spots when you tap \"I'm here\", and, only if you turn it on, to share where you are with friends you choose.",
+          "locationAlwaysAndWhenInUsePermission": "Only if you turn on Nearby alerts: Flyer checks your rough location in the background, on campus only, to tell you when a friend who also turned it on is close by. Friends never see where you are. Turn it off any time in Friends → Sharing.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Flyer adds your classes and due dates to a separate Flyer calendar when you tap Export."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Flyer reads only the photo you pick: a schedule screenshot to add your classes, or a photo to ask Pilot about or send to a friend.",
+          "cameraPermission": "Flyer uses the camera to scan a friend's QR code, and to take a photo you choose to send to Pilot or a friend."
+        }
+      ],
+      [
+        "expo-tracking-transparency",
+        {
+          "userTrackingPermission": "This lets ads in Flyer be more relevant. Saying no is fine: you'll still see ads, just less relevant ones. Your schedule, location, and friends are never shared with advertisers."
+        }
+      ],
+      [
+        "react-native-google-mobile-ads",
+        {
+          "iosAppId": "ca-app-pub-2470651802364867~1405589115",
+          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "userTrackingUsageDescription": "This lets ads in Flyer be more relevant. Saying no is fine: you'll still see ads, just less relevant ones. Your schedule, location, and friends are never shared with advertisers."
+        }
+      ],
+      "@bacons/apple-targets",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Flyer uses the camera to scan a friend's QR code, and to take a photo you choose to send to Pilot or a friend.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "bundleIdentifier": "com.joshuat8808.flyer.widget",
+                  "targetName": "FlyerWidget",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.joshuat8808.flyer"
+                    ]
+                  }
+                },
+                {
+                  "bundleIdentifier": "com.joshuat8808.flyer.widget",
+                  "targetName": "FlyerWidget",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.joshuat8808.flyer"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "8a52ed3c-5954-4d35-8517-0468c1454e94"
+      }
+    },
+    "owner": "joshuat8808"
+  }
+}

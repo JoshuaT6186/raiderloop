@@ -16,8 +16,6 @@ function tryRequire(fn) {
 export const SvgLib = tryRequire(() => require('react-native-svg'));
 export const Maps = Platform.OS === 'web' ? null : tryRequire(() => require('react-native-maps'));
 export const ImagePicker = tryRequire(() => require('expo-image-picker'));
-export const DocumentPicker = tryRequire(() => require('expo-document-picker'));
-export const FileSystem = tryRequire(() => require('expo-file-system'));
 export const Notifications = tryRequire(() => {
   const N = require('expo-notifications');
   N.setNotificationHandler({
@@ -44,11 +42,17 @@ export const MobileAds = Platform.OS === 'web' ? null : tryRequire(() => require
 export const Tracking = Platform.OS === 'ios' ? tryRequire(() => require('expo-tracking-transparency')) : null;
 export const Purchases = Platform.OS === 'web' ? null : tryRequire(() => require('react-native-purchases').default);
 export const AppleTargets = Platform.OS === 'ios' ? tryRequire(() => require('@bacons/apple-targets')) : null;
+
+/* Added in Flyer 2 (each feature says "not in this build" without them). */
 export const Camera = Platform.OS === 'web' ? null : tryRequire(() => require('expo-camera'));
-export const TaskManager = Platform.OS === 'web' ? null : tryRequire(() => require('expo-task-manager'));
-export const QRCode = tryRequire(() => require('react-native-qrcode-svg').default);
-export const Constants = tryRequire(() => require('expo-constants').default);
+export const DocumentPicker = tryRequire(() => require('expo-document-picker'));
 export const ImageManipulator = tryRequire(() => require('expo-image-manipulator'));
+export const SecureStore = Platform.OS === 'web' ? null : tryRequire(() => require('expo-secure-store'));
+export const KeepAwake = tryRequire(() => require('expo-keep-awake'));
+export const Constants = tryRequire(() => require('expo-constants').default);
+export const AltIcons = Platform.OS === 'ios' ? tryRequire(() => require('expo-alternate-app-icons')) : null;
+export const HealthKit = Platform.OS === 'ios' ? tryRequire(() => require('@kingstinct/react-native-healthkit')) : null;
+export const Clipboard = tryRequire(() => require('expo-clipboard'));
 
 export function tap(kind = 'light') {
   if (!Haptics) return;

@@ -6,30 +6,12 @@
 import { BUILDINGS } from './buildings';
 import { DINING } from './dining';
 import { ORGS } from './orgs';
-import FOOTBALL from '../../functions/src/shared/football.json';
 import { isOpenNow } from '../lib/hours';
 
 export { BUILDINGS, DINING, ORGS };
 
 export const buildingById = (id) => BUILDINGS.find((b) => b.id === id);
-/* Walk times are measured from where the student actually is. The
-   old fixed b.walk numbers were from the middle of campus, so a class
-   across campus could show 4 min when it's really 15. With no location
-   (permission off, or off campus) we show no number at all rather than
-   a wrong one. */
-let herePos = null;
-export const setHere = (p) => { herePos = p || null; };
-export const getHere = () => herePos;
-const MAX_WALK_M = 4000; // farther than this, a walk time isn't useful
-export function walkMinsFor(x, pos = herePos) {
-  if (!x || !pos) return null;
-  const place = x.lat != null ? x : (x.buildingId ? BUILDINGS.find((b) => b.id === x.buildingId) : null);
-  if (!place || place.lat == null) return null;
-  const m = distanceM(pos, place);
-  if (m == null || m > MAX_WALK_M) return null;
-  return walkMinutes(m);
-}
-export const walkLabel = (b, pos) => { const n = walkMinsFor(b, pos); return n ? `${n} min walk` : ''; };
+export const walkLabel = (b) => (b && b.walk ? `${b.walk} min walk` : '');
 
 export const CAT_LABELS = { Worship: 'Faith & Spiritual Life' };
 export const catLabel = (c) => CAT_LABELS[c] || c;
@@ -73,22 +55,21 @@ export const QUICK_LINKS = [
 ];
 
 /* ---------- Floor plans ----------
-   TTU's Matador Information Portal hosts official per-floor PDFs for
-   every TTU building (depts.ttu.edu/odpa/SPI/FacilitiesInventory).
-   It can't be deep-linked per building, so we open it and tell the
-   student which building to pick. Two buildings publish their own
-   friendlier floor maps, linked directly. */
+   Only two buildings publish public floor maps students can open
+   without a staff login: the Student Union and the Library. Every
+   other building gets Flyer's own floor guide (room → floor, the
+   entrances students actually use, elevator status), never a link
+   to a portal students can't get into. */
 export const FLOOR_PLANS = {
-  portal: 'https://odis.operations.ttu.edu/odmip/default.aspx',
-  howTo: 'tap Floorplans, choose a floor, then open the PDF.',
   direct: {
     'student-union': { label: 'SUB floor maps', url: 'https://www.depts.ttu.edu/sub/SUBmap.php' },
     'texas-tech-university-library': { label: 'Library floor maps', url: 'https://www.depts.ttu.edu/library/building/checklist/maps.php' },
   },
 };
+/** The official public floor map for a building, or null. */
 export function floorPlanFor(b) {
   if (!b) return null;
-  return FLOOR_PLANS.direct[b.id] || { label: 'Official floor plans (MIP)', url: FLOOR_PLANS.portal, howTo: FLOOR_PLANS.howTo };
+  return FLOOR_PLANS.direct[b.id] || null;
 }
 
 /* ---------- Commuter parking ----------
@@ -111,17 +92,22 @@ export const BUS_STOPS = [
   { id: 'bus-library', name: 'TTU Library', buildingId: 'texas-tech-university-library', route: 'Red Raider' },
 ].map((s) => { const b = buildingById(s.buildingId); return { ...s, lat: b?.lat, lng: b?.lng }; });
 
-/* ---------- Football ----------
-   The schedule lives in functions/src/shared/football.json so the app
-   and the server (game-day check-ins) read the same thing. After each
-   game, add its score to `result` there (e.g. "W 31-17") and fill in
-   any "Time TBA" kickoff once it's announced. Source of truth:
-   https://texastech.com/sports/football/schedule */
-export const FOOTBALL_SCHEDULE = FOOTBALL.games;
-const isTba = (g) => { const d = new Date(g.kickoff); return d.getHours() === 0 && d.getMinutes() === 0; };
-// A game with no announced time counts as "next" until the end of its day.
-const endsAt = (g) => (isTba(g) ? new Date(g.kickoff).getTime() + 24 * 3600000 : new Date(g.kickoff).getTime());
-export const nextGame = (now = new Date()) => FOOTBALL_SCHEDULE.find((g) => endsAt(g) > now.getTime()) || null;
+/* ---------- Football (verified 2026 schedule) ---------- */
+export const FOOTBALL_SCHEDULE = [
+  { kickoff: '2026-09-05T18:00:00', opponent: 'Abilene Christian', homeAway: 'home', venue: 'Galaxy Stadium', buildingId: 'jones-att-stadium', result: 'W 33-10' },
+  { kickoff: '2026-09-12T18:30:00', opponent: 'Oregon State', homeAway: 'away', venue: 'Reser Stadium', buildingId: null, result: null },
+  { kickoff: '2026-09-18T19:00:00', opponent: 'Houston', homeAway: 'home', venue: 'Galaxy Stadium', buildingId: 'jones-att-stadium', result: null },
+  { kickoff: '2026-09-26T12:00:00', opponent: 'Sam Houston', homeAway: 'home', venue: 'Galaxy Stadium', buildingId: 'jones-att-stadium', result: null },
+  { kickoff: '2026-10-03T12:00:00', opponent: 'Colorado', homeAway: 'away', venue: 'Folsom Field', buildingId: null, result: null },
+  { kickoff: '2026-10-17T12:00:00', opponent: 'Arizona State', homeAway: 'home', venue: 'Galaxy Stadium', buildingId: 'jones-att-stadium', result: null },
+  { kickoff: '2026-10-24T12:00:00', opponent: 'Cincinnati', homeAway: 'away', venue: 'Nippert Stadium', buildingId: null, result: null },
+  { kickoff: '2026-10-31T12:00:00', opponent: 'Arizona', homeAway: 'home', venue: 'Galaxy Stadium', buildingId: 'jones-att-stadium', result: null },
+  { kickoff: '2026-11-07T12:00:00', opponent: 'West Virginia', homeAway: 'home', venue: 'Galaxy Stadium', buildingId: 'jones-att-stadium', result: null },
+  { kickoff: '2026-11-14T12:00:00', opponent: 'Oklahoma State', homeAway: 'away', venue: 'Boone Pickens Stadium', buildingId: null, result: null },
+  { kickoff: '2026-11-21T12:00:00', opponent: 'Baylor', homeAway: 'away', venue: 'McLane Stadium', buildingId: null, result: null },
+  { kickoff: '2026-11-26T19:00:00', opponent: 'TCU', homeAway: 'home', venue: 'Galaxy Stadium', buildingId: 'jones-att-stadium', result: null },
+];
+export const nextGame = (now = new Date()) => FOOTBALL_SCHEDULE.find((g) => new Date(g.kickoff) > now) || null;
 export function lastGame(now = new Date()) {
   const played = FOOTBALL_SCHEDULE.filter((g) => new Date(g.kickoff) <= now && g.result);
   return played.length ? played[played.length - 1] : null;
@@ -129,8 +115,7 @@ export function lastGame(now = new Date()) {
 export function gameDateLabel(iso, now = new Date()) {
   const d = new Date(iso);
   const days = Math.round((new Date(iso).setHours(0, 0, 0, 0) - new Date(now).setHours(0, 0, 0, 0)) / 86400000);
-  const tba = d.getHours() === 0 && d.getMinutes() === 0;
-  const time = tba ? 'Time TBA' : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   if (days === 0) return `Today · ${time}`;
   if (days === 1) return `Tomorrow · ${time}`;
   return `${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${time}`;
@@ -139,7 +124,7 @@ export function gameDateLabel(iso, now = new Date()) {
    offer "Gameday sharing" with friends. */
 export function liveHomeGame(now = new Date()) {
   return FOOTBALL_SCHEDULE.find((g) => {
-    if (g.homeAway !== 'home' || isTba(g)) return false;
+    if (g.homeAway !== 'home') return false;
     const k = new Date(g.kickoff).getTime();
     return now.getTime() > k - 3 * 3600000 && now.getTime() < k + 4 * 3600000;
   }) || null;
@@ -243,8 +228,5 @@ export function distanceM(a, b) {
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(toR(a.lat)) * Math.cos(toR(b.lat)) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h));
 }
-/* Straight-line distance undercounts real walks (buildings, paths,
-   crossings), so it's stretched by a route factor of 1.3, then walked
-   at ~1.34 m/s (about 3 mph). */
-const ROUTE_FACTOR = 1.3;
-export const walkMinutes = (m) => (m == null ? null : Math.max(1, Math.round((m * ROUTE_FACTOR) / 1.34 / 60)));
+/* ~1.35 m/s walking pace, same assumption as the original walk times. */
+export const walkMinutes = (m) => (m == null ? null : Math.max(1, Math.round(m / 1.35 / 60)));

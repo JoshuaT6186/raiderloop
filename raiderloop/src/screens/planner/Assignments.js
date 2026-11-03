@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { View, Pressable } from 'react-native';
 import { useApp } from '../../state/AppContext';
-import { T, PostIt, PT, Button, Section, Empty, Check } from '../../ui/Paper';
+import { T, PostIt, PT, Button, Section, Empty, Check, Stamp } from '../../ui/Paper';
 import Icon from '../../ui/Icon';
 import AssignmentForm from '../../sheets/AssignmentForm';
+import CanvasCard from './CanvasCard';
 import { dueLabel, metaLine } from '../../lib/time';
 
 function group(list) {
@@ -33,9 +34,10 @@ export default function Assignments() {
 
   return (
     <View>
+      <CanvasCard />
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 16 }}>
-        <T kind="hand" style={{ flex: 1 }}>{open ? `${open} to do` : 'nothing due, nice'}</T>
-        <Button title="Scan syllabus" icon="scan" small kind="ghost" onPress={() => setSheet({ type: 'syllabus' })} style={{ marginRight: 8 }} />
+        <T kind="hand" style={{ flex: 1 }}>{open ? `${open} to do` : 'nothing due. nice'}</T>
+        <Button title="Syllabus" icon="upload" small kind="ghost" onPress={() => setSheet({ type: 'syllabus' })} style={{ marginRight: 8 }} />
         <Button title="Add" icon="plus" small onPress={() => setForm('new')} />
       </View>
       {Object.entries(g).filter(([k, v]) => v.length && (k !== 'Done' || showDone)).map(([k, v]) => (
@@ -49,15 +51,17 @@ export default function Assignments() {
                   <PT kind="bold" style={a.done ? { textDecorationLine: 'line-through' } : null} numberOfLines={2}>{a.title}</PT>
                   <PT kind="small">{metaLine(a.course, dueLabel(a.due))}</PT>
                 </View>
-                <Pressable onPress={() => setForm(a)} hitSlop={10} accessibilityLabel={`Edit ${a.title}`} style={{ marginLeft: 6 }}>
-                  <Icon name="pencil" size={16} color="#4B5571" />
-                </Pressable>
+                {a.source === 'canvas' ? <Stamp label="Canvas" color="#2F5DA8" /> : (
+                  <Pressable onPress={() => setForm(a)} hitSlop={10} accessibilityLabel={`Edit ${a.title}`} style={{ marginLeft: 6 }}>
+                    <Icon name="pencil" size={16} color="#4B5571" />
+                  </Pressable>
+                )}
               </View>
             ))}
           </PostIt>
         </View>
       ))}
-      {!sorted.length ? <Empty icon="clipboard" title="No assignments yet" body="Scan a syllabus to load every due date at once, or add them one by one. Flyer reminds you the day before and two hours before." action="Scan a syllabus" onAction={() => setSheet({ type: 'syllabus' })} /> : null}
+      {!sorted.length ? <Empty icon="clipboard" title="No assignments yet" body="Add what's due and Flyer will remind you the day before and two hours before." action="Add assignment" onAction={() => setForm('new')} /> : null}
       {g.Done.length ? <Button title={showDone ? 'Hide finished' : `Show ${g.Done.length} finished`} kind="ghost" small onPress={() => setShowDone(!showDone)} style={{ marginTop: 14 }} /> : null}
       {form ? <AssignmentForm existing={form === 'new' ? null : form} onClose={() => setForm(null)} /> : null}
     </View>
