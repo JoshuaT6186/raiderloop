@@ -160,7 +160,7 @@
         "@kingstinct/react-native-healthkit",
         {
           "NSHealthShareUsageDescription": "Flyer shows last night's sleep and today's steps next to your schedule. It reads them on your phone only and never saves or shares them.",
-          "NSHealthUpdateUsageDescription": false,
+          "NSHealthUpdateUsageDescription": "Flyer never writes to Apple Health. It only reads sleep and steps, and this text is required by Apple for the Health framework.",
           "background": false
         }
       ],
