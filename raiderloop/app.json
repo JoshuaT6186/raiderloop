@@ -45,7 +45,8 @@
       "associatedDomains": [
         "applinks:raiderloop-98046.web.app",
         "applinks:raiderloop-98046.firebaseapp.com"
-      ]
+      ],
+      "appleTeamId": "ABCDE12345"
     },
     "android": {
       "package": "com.joshuat8808.flyer",
