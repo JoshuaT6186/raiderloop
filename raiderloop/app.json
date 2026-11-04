@@ -69,6 +69,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "./plugins/withMessagesIcons",
       "./plugins/withNoBackgroundLocation",
       "expo-font",
       "expo-web-browser",
