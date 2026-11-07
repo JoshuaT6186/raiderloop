@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Animated, Easing, SafeAreaView } from 'react-native';
 import { useApp } from '../../state/AppContext';
 import { useTheme } from '../../theme/ThemeContext';
@@ -6,12 +6,14 @@ import { PAD, SCREEN_W } from '../../theme/tokens';
 import { T, NotebookBg, PostIt, PT, Button, Scribble } from '../../ui/Paper';
 import { PlaneMark } from '../../ui/Logo';
 import { APP } from '../../config';
+import { CampusGuideSheet } from '../../sheets/Guide';
 
 /* The paper airplane glides in along a gentle arc, then the notes
    drop onto the page one by one. */
 export default function Welcome() {
   const { t } = useTheme();
   const { set } = useApp();
+  const [guide, setGuide] = useState(false);
   const fly = useRef(new Animated.Value(0)).current;
   const notes = useRef([0, 1, 2].map(() => new Animated.Value(0))).current;
 
@@ -56,9 +58,11 @@ export default function Welcome() {
         </View>
         <View style={{ paddingLeft: PAD + 22, paddingRight: PAD, paddingBottom: 14 }}>
           <Button title="Let's fly" icon="plane" onPress={() => set({ onboardStep: 'account' })} />
+          <Button title="Just looking? See the Campus Guide" icon="book" kind="ghost" onPress={() => setGuide(true)} style={{ marginTop: 10 }} />
           <T kind="small" style={{ textAlign: 'center', marginTop: 12, fontSize: 11.5 }}>{APP.disclaimer}</T>
         </View>
       </SafeAreaView>
+      {guide ? <CampusGuideSheet onClose={() => setGuide(false)} /> : null}
     </View>
   );
 }

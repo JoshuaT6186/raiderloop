@@ -16,6 +16,7 @@ import { FolderTabs, FadeIn, SectionNote } from '../ui/Kit';
 import { PublicPostCard, AREAS } from '../sheets/Public';
 import Icon from '../ui/Icon';
 import { useCallable } from '../lib/hooks';
+import { useGames } from '../lib/games';
 import { api, listenPublic } from '../lib/firebase';
 import { metaLine } from '../lib/time';
 import { isOpenNow, todayHoursText } from '../lib/hours';
@@ -23,7 +24,7 @@ import { openUrl } from '../lib/links';
 import { BannerAd, affiliateSearchUrl, isAffiliate } from '../lib/monetize';
 import {
   ORGS, DINING, BUILDINGS, STUDY, RESOURCES, QUICK_LINKS, GREEK_ORGS, ORG_CATEGORIES, orgsForInterests,
-  nextGame, lastGame, gameDateLabel, SPORTS_LIST, catLabel, walkLabel, FOOTBALL_SCHEDULE,
+  gameDateLabel, SPORTS_LIST, catLabel, walkLabel, FOOTBALL_SCHEDULE,
 } from '../data/campus';
 
 const CARD_W = SCREEN_W * 0.62;
@@ -46,23 +47,30 @@ function SearchResults({ q }) {
   );
 }
 
-/* ---------- Featured game ---------- */
+/* ---------- Featured game ----------
+   Football while it's on, then basketball. The score line only shows
+   a real, finished result. */
 function FeaturedGame() {
   const { setSheet } = useApp();
-  const g = nextGame(); const last = lastGame();
-  const img = useCallable(api.getVenueImage, { query: 'Galaxy Stadium Lubbock Texas Tech football stadium' }, 'image', { asArray: false });
+  const games = useGames();
+  const g = games.next; const last = games.last;
+  const query = games.sport === 'Basketball' ? 'United Supermarkets Arena Lubbock Texas Tech basketball' : 'Galaxy Stadium Lubbock Texas Tech football stadium';
+  const img = useCallable(api.getVenueImage, { query }, 'image', { asArray: false, enabled: !!g && g.homeAway === 'home' });
+  const [imgOk, setImgOk] = useState(true);
   if (!g) return null;
   const home = g.homeAway === 'home';
+  const open = () => (games.sport === 'Football' ? setSheet({ type: 'gameday', kickoff: g.kickoff }) : setSheet({ type: 'sports' }));
   return (
-    <PostIt color="orange" tilt={-1.2} tape padding={0} onPress={() => setSheet({ type: 'gameday', kickoff: g.kickoff })} style={{ marginTop: 14, overflow: 'hidden' }}>
-      {img.data ? <Image source={{ uri: img.data }} style={{ width: '100%', height: 150, borderTopLeftRadius: 3, borderTopRightRadius: 3 }} resizeMode="cover" /> : null}
+    <PostIt color="orange" tilt={-1.2} tape padding={0} onPress={open} style={{ marginTop: 14, overflow: 'hidden' }}>
+      {img.data && home && imgOk ? <Image source={{ uri: img.data }} onError={() => setImgOk(false)} style={{ width: '100%', height: 150, borderTopLeftRadius: 3, borderTopRightRadius: 3 }} resizeMode="cover" /> : null}
       <View style={{ padding: 14 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <PT kind="tiny" style={{ flex: 1 }}>Next game · {home ? 'Home' : 'Away'}</PT>
-          {last ? <PT kind="small">Last: {last.result} vs {last.opponent}</PT> : null}
+          <PT kind="tiny" style={{ flex: 1 }}>Next {games.sport === 'Basketball' ? 'basketball' : 'football'} game · {home ? 'Home' : g.homeAway === 'neutral' ? 'Neutral site' : 'Away'}</PT>
+          {last && last.result ? <PT kind="small">Last: {last.result} vs {last.opponent}</PT> : null}
         </View>
         <PT kind="title" style={{ fontSize: 22, lineHeight: 27, marginTop: 4 }}>{home ? 'vs.' : 'at'} {g.opponent}</PT>
         <PT kind="small">{metaLine(gameDateLabel(g.kickoff), g.venue)}</PT>
+        {games.offseasonNote ? <PT kind="small" style={{ marginTop: 4 }}>{games.offseasonNote}</PT> : null}
       </View>
     </PostIt>
   );
@@ -259,7 +267,6 @@ function HappeningLane({ area }) {
   return (
     <FadeIn>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 4 }}>
-        <Button title="Scan a flyer" icon="scan" small kind="ghost" onPress={() => setSheet({ type: 'scanFlyer' })} style={{ marginRight: 8, marginBottom: 8 }} />
         <Button title="Post an event" icon="plus" small kind="ghost" onPress={() => setSheet({ type: 'publicNew', kind: 'event' })} style={{ marginRight: 8, marginBottom: 8 }} />
         <Button title="Right now" icon="bolt" small kind="ghost" onPress={() => setSheet({ type: 'publicNew', kind: 'now' })} style={{ marginBottom: 8 }} />
       </View>

@@ -9,20 +9,32 @@ import { uploadLocalFile } from './firebase';
 export class PickError extends Error {}
 
 async function shrink(uri, maxSide = 1600, base64 = false) {
-  if (!ImageManipulator) return { uri, base64: null };
+  if (!ImageManipulator) return { uri, base64: null, ok: false };
   try {
     if (ImageManipulator.manipulateAsync) {
       const r = await ImageManipulator.manipulateAsync(uri, [{ resize: { width: maxSide } }], { compress: 0.72, format: ImageManipulator.SaveFormat.JPEG, base64 });
-      return { uri: r.uri, base64: r.base64 || null };
+      return { uri: r.uri, base64: r.base64 || null, ok: true };
     }
     const ctx = ImageManipulator.ImageManipulator.manipulate(uri);
     ctx.resize({ width: maxSide });
     const img = await ctx.renderAsync();
     const r = await img.saveAsync({ compress: 0.72, format: ImageManipulator.SaveFormat.JPEG, base64 });
-    return { uri: r.uri, base64: r.base64 || null };
+    return { uri: r.uri, base64: r.base64 || null, ok: true };
   } catch (e) {
-    return { uri, base64: null };
+    return { uri, base64: null, ok: false };
   }
+}
+
+/* What a file really is, when it couldn't be turned into a JPEG.
+   Labelling an iPhone HEIC photo as a JPEG made the photo checker
+   fail, which looked like "it won't let me post". */
+function typeOf(uri, fallback = 'image/jpeg') {
+  const u = String(uri || '').toLowerCase().split('?')[0];
+  if (u.endsWith('.png')) return 'image/png';
+  if (u.endsWith('.webp')) return 'image/webp';
+  if (u.endsWith('.heic') || u.endsWith('.heif')) return 'image/heic';
+  if (u.endsWith('.jpg') || u.endsWith('.jpeg')) return 'image/jpeg';
+  return fallback;
 }
 
 /** Opens the camera or the photo library. Returns null if cancelled. */
@@ -37,7 +49,9 @@ export async function pickPhoto({ camera = false, base64 = false, maxSide = 1600
   if (!result || result.canceled || !result.assets || !result.assets[0]) return null;
   const a = result.assets[0];
   const small = await shrink(a.uri, Math.min(maxSide, a.width || maxSide), base64);
-  return { uri: small.uri, base64: small.base64, width: a.width, height: a.height, contentType: 'image/jpeg' };
+  const contentType = small.ok ? 'image/jpeg' : typeOf(a.uri, a.mimeType || 'image/jpeg');
+  if (contentType === 'image/heic') throw new PickError("That photo is in a format Flyer can't read yet. Try taking it with the Flyer camera button instead.");
+  return { uri: small.uri, base64: small.base64 || a.base64 || null, width: a.width, height: a.height, contentType };
 }
 
 /** Pick a PDF (or an image) from Files. */
@@ -48,7 +62,7 @@ export async function pickDocument({ types = ['application/pdf', 'image/*'] } = 
   const a = r.assets[0];
   let contentType = a.mimeType || (/\.pdf$/i.test(a.name || '') ? 'application/pdf' : 'image/jpeg');
   let { uri } = a;
-  if (contentType.startsWith('image/')) { const s = await shrink(uri); uri = s.uri; contentType = 'image/jpeg'; }
+  if (contentType.startsWith('image/')) { const s = await shrink(uri); uri = s.uri; contentType = s.ok ? 'image/jpeg' : typeOf(a.uri, contentType); }
   if (a.size && a.size > 24 * 1024 * 1024) throw new PickError('That file is over 24 MB. Try a smaller one.');
   return { uri, name: a.name || 'file', size: a.size || 0, contentType };
 }

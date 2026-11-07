@@ -14,7 +14,7 @@ import { isOpenNow, minutesUntilClose, todayHoursText } from '../lib/hours';
 import { currentPosition } from '../lib/location';
 import { metaLine } from '../lib/time';
 import {
-  BUILDINGS, DINING, STUDY, distanceM, walkMinutes, COMMUTER_LOTS, PARKING_LINKS, catLabel,
+  BUILDINGS, DINING, STUDY, distanceM, walkMinutes, COMMUTER_LOTS, PARKING_LINKS, catLabel, BUS_STOPS,
 } from '../data/campus';
 import { SAFETY, CHECKED } from '../config';
 import LastChecked from '../ui/LastChecked';
@@ -76,30 +76,42 @@ export function ParkingSheet({ onClose }) {
   const live = useCallable(api.getParking, {}, null, { asArray: false });
   const lots = live.data?.lots || [];
   const byLot = Object.fromEntries(lots.map((l) => [l.lot, l]));
+  /* The live numbers come from Parking Services' own posts, which can
+     take a while to find. Everything else on this sheet shows right
+     away; after 8 seconds the live part stops making you wait. */
+  const [slow, setSlow] = useState(false);
+  useEffect(() => { const id = setTimeout(() => setSlow(true), 8000); return () => clearTimeout(id); }, []);
+  const checking = live.loading && !slow;
   return (
-    <Sheet title="Commuter parking" hand="From TTU Transportation & Parking Services' own posted updates" onClose={onClose}>
-      {live.loading ? <Loading label="Checking today's lot updates…" /> : null}
-      {!live.loading && live.data?.postedAt ? <T kind="hand" color={t.accent} style={{ marginBottom: 8 }}>Last update posted {live.data.postedAt}</T> : null}
-      {!live.loading && !lots.length ? (
-        <PostIt color="yellow" seed="park-none" tape style={{ marginBottom: 12 }}>
-          <PT kind="bold">No lot update posted yet today.</PT>
-          <PT kind="small" style={{ marginTop: 4 }}>Parking Services usually posts a few times on weekdays during the semester. Flyer only shows today's real numbers, never old ones.</PT>
-        </PostIt>
-      ) : null}
-      {(lots.length ? COMMUTER_LOTS : []).map((lot) => {
-        const l = byLot[lot];
-        return (
-          <View key={lot} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }}>
-            <View style={{ width: 54 }}><T kind="title">{lot}</T></View>
-            {l ? <Meter pct={l.percentFull} /> : <T kind="small" style={{ flex: 1 }}>not in today's update</T>}
-            <T kind="num" style={{ width: 54, textAlign: 'right' }}>{l ? `${l.percentFull}%` : '—'}</T>
-          </View>
-        );
-      })}
+    <Sheet title="Commuter parking" hand="Lots, maps, and Parking Services' live posts" onClose={onClose}>
+      <PostIt color={lots.length ? 'green' : 'yellow'} seed="park-live" tape style={{ marginBottom: 12 }}>
+        <PT kind="tiny">Live lot fullness</PT>
+        {checking ? <PT kind="small" style={{ marginTop: 4 }}>Checking today's update from Parking Services…</PT> : null}
+        {!checking && lots.length ? <PT kind="bold" style={{ marginTop: 2 }}>Updated {live.data.postedAt || 'today'}</PT> : null}
+        {!checking && !lots.length ? (
+          <>
+            <PT kind="bold" style={{ marginTop: 2 }}>No live update posted yet today</PT>
+            <PT kind="small" style={{ marginTop: 4 }}>Parking Services posts lot fullness on busy weekdays. Flyer only shows today's real numbers, never old ones. Their live feed is linked below.</PT>
+          </>
+        ) : null}
+      </PostIt>
+      <T kind="tiny" style={{ marginBottom: 4 }}>Commuter lots</T>
+      <Card>
+        {COMMUTER_LOTS.map((lot, i) => {
+          const l = byLot[lot];
+          return (
+            <View key={lot} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: i === COMMUTER_LOTS.length - 1 ? 0 : 1, borderBottomColor: t.border }}>
+              <View style={{ width: 54 }}><T kind="title">{lot}</T></View>
+              {l ? <Meter pct={l.percentFull} /> : <T kind="small" style={{ flex: 1 }}>{checking ? 'checking…' : 'no live number right now'}</T>}
+              <T kind="num" style={{ width: 54, textAlign: 'right' }}>{l ? `${l.percentFull}%` : ''}</T>
+            </View>
+          );
+        })}
+      </Card>
       <View style={{ marginTop: 14 }}>
+        <Row title="Live posts from Parking Services" meta="Their own updates, as they post them" left={<Icon name="megaphone" color={t.ink} />} onPress={() => openUrl(PARKING_LINKS.updates)} />
         <Row title="Commuter permits & lots" meta="Official TTU page" left={<Icon name="parking" color={t.ink} />} onPress={() => openUrl(PARKING_LINKS.commuter)} />
-        <Row title="Campus parking maps" left={<Icon name="map" color={t.ink} />} onPress={() => openUrl(PARKING_LINKS.map)} />
-        <Row title="Live posts from Parking Services" left={<Icon name="megaphone" color={t.ink} />} onPress={() => openUrl(PARKING_LINKS.updates)} last />
+        <Row title="Campus parking maps" left={<Icon name="map" color={t.ink} />} onPress={() => openUrl(PARKING_LINKS.map)} last />
       </View>
     </Sheet>
   );
@@ -135,6 +147,36 @@ export function SafetySheet({ onClose }) {
       </Card>
       <Pressable onPress={() => openUrl(SAFETY.campusPolice.source)} style={{ marginTop: 14 }}><T kind="small" color={t.accent}>Source: depts.ttu.edu/ttpd/contact.php</T></Pressable>
       <LastChecked date={CHECKED.safety} source="Texas Tech Police" itemId="safety:ttpd" title="Campus police number" url={SAFETY.campusPolice.source} />
+    </Sheet>
+  );
+}
+
+/* ---------- Citibus stop ----------
+   Citibus runs two campus loops: Red Raider (clockwise) and Double T
+   (counter-clockwise). Live bus positions come from the GoPass app,
+   which TTU Parking recommends. Source: depts.ttu.edu/parking/InformationFor/Busing.php */
+const BUS_LINKS = {
+  schedule: 'https://citibus.com/maps-and-schedules/#ttu-route-schedule',
+  ttu: 'https://www.depts.ttu.edu/parking/InformationFor/Busing.php',
+  sga: 'https://www.depts.ttu.edu/sga/CitiBusRoutes.php',
+};
+export function BusSheet({ id, onClose }) {
+  const { t } = useTheme();
+  const { setSheet } = useApp();
+  const stop = BUS_STOPS.find((s) => s.id === id) || null;
+  return (
+    <Sheet title={stop ? `Citibus: ${stop.name}` : 'Citibus'} hand="Campus routes run by Citibus" onClose={onClose} height={0.72}>
+      <PostIt color="blue" tilt={-1} tape>
+        <PT kind="tiny">{stop ? `${stop.route} route stop` : 'Campus routes'}</PT>
+        <PT kind="bold" style={{ marginTop: 2 }}>Red Raider loops campus clockwise. Double T loops counter-clockwise.</PT>
+        <PT kind="small" style={{ marginTop: 6 }}>For live bus positions, TTU Parking recommends the GoPass app (no account needed).</PT>
+      </PostIt>
+      <Card style={{ marginTop: 14 }}>
+        <Row title="Route maps and schedules" meta="Citibus, TTU routes" left={<Icon name="route" color={t.ink} />} onPress={() => openUrl(BUS_LINKS.schedule)} />
+        <Row title="Busing at Texas Tech" meta="How to track buses live, from TTU Parking" left={<Icon name="bus" color={t.ink} />} onPress={() => openUrl(BUS_LINKS.ttu)} />
+        <Row title="Apartment shuttle routes" meta="SGA's Citibus page" left={<Icon name="map" color={t.ink} />} onPress={() => openUrl(BUS_LINKS.sga)} last={!stop || !stop.buildingId} />
+        {stop && stop.buildingId ? <Row title="What's at this stop" meta={stop.name} left={<Icon name="building" color={t.ink} />} onPress={() => setSheet({ type: 'building', id: stop.buildingId })} last /> : null}
+      </Card>
     </Sheet>
   );
 }

@@ -39,7 +39,6 @@ export function ShareViewSheet({ id, onClose }) {
   const openRef = () => {
     if (s.kind === 'plan' && ref) setSheet({ type: 'plan', id: ref });
     else if (s.kind === 'group' && ref) setSheet({ type: 'group', code: ref });
-    else if (s.kind === 'queue' && ref) setSheet({ type: 'queue', code: ref });
     else if ((s.kind === 'event' || s.kind === 'tip' || s.kind === 'deal') && ref) setSheet({ type: 'publicPost', id: ref });
   };
   const toCalendar = async () => {
@@ -57,7 +56,7 @@ export function ShareViewSheet({ id, onClose }) {
         {d.img ? <Image source={{ uri: d.img }} style={{ width: '100%', height: 170, borderRadius: 8, marginTop: 10 }} resizeMode="cover" /> : null}
       </PostIt>
       <View style={{ marginTop: 16 }}>
-        {ref && ['plan', 'group', 'queue', 'event', 'tip', 'deal'].includes(s.kind) ? <Button title={s.kind === 'plan' ? 'Open the plan and vote' : s.kind === 'group' ? 'Open the group' : s.kind === 'queue' ? 'Get in line' : 'Open in Discover'} icon="arrow" onPress={openRef} style={{ marginBottom: 8 }} /> : null}
+        {ref && ['plan', 'group', 'event', 'tip', 'deal'].includes(s.kind) ? <Button title={s.kind === 'plan' ? 'Open the plan and vote' : s.kind === 'group' ? 'Open the group' : s.kind === 'queue' ? 'Get in line' : 'Open in Discover'} icon="arrow" onPress={openRef} style={{ marginBottom: 8 }} /> : null}
         {startsAt ? <Button title="Add to my calendar" icon="calendar" kind="ghost" onPress={toCalendar} style={{ marginBottom: 8 }} /> : null}
         {building ? <Button title={`Find ${place.room ? `room ${place.room}` : building.name}`} icon="pin" kind="ghost" onPress={() => setSheet({ type: 'rooms', query: d.where })} style={{ marginBottom: 8 }} /> : null}
         {!building && d.where ? <Button title="Directions" icon="pin" kind="ghost" onPress={() => openUrl(`https://maps.apple.com/?q=${encodeURIComponent(`${d.where}, Lubbock TX`)}`)} style={{ marginBottom: 8 }} /> : null}

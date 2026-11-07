@@ -27,5 +27,5 @@
 Object.assign(
   exports,
   require('./src/ai'), require('./src/social'), require('./src/canvas'), require('./src/hub'),
-  require('./src/connect'), require('./src/posts'), require('./src/together'), require('./src/play'), require('./src/tools'), require('./src/web'),
+  require('./src/connect'), require('./src/posts'), require('./src/together'), require('./src/play'), require('./src/tools'), require('./src/web'), require('./src/sports'), require('./src/places'),
 );

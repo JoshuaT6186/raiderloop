@@ -342,8 +342,12 @@ exports.dropSend = onCall({ ...C.callOpts(AI), memory: '512MiB' }, async (reques
     const b = await db.doc(`beacons/${r}`).get();
     if (b.exists && Date.now() - b.data().at < 180000) recipients.push(r);
   }
+  /* "My devices": send it to yourself, so it shows up in Flyer on
+     your laptop (web) or your other phone. */
+  const toSelf = !!d.self;
+  if (toSelf) recipients.push(uid);
   const open = !!d.open;
-  if (!open && !recipients.length) throw new HttpsError('failed-precondition', 'Nobody to send to. Pick a friend, someone nearby, or use the QR code.');
+  if (!open && !recipients.length) throw new HttpsError('failed-precondition', 'Nobody to send to. Pick a friend, someone nearby, My devices, or use the QR code.');
   const textToCheck = [payload.title, payload.text, payload.desc, payload.url].filter(Boolean).join('\n');
   let fileUrl = null; let fileType = null;
   if (kind === 'photo' || kind === 'file') {
@@ -368,11 +372,13 @@ exports.dropSend = onCall({ ...C.callOpts(AI), memory: '512MiB' }, async (reques
   const now = Date.now();
   await db.doc(`drops/${id}`).set({
     from: uid, fromName: C.firstAndInitial(me.name), fromAvatar: me.avatar, kind, payload, fileUrl, fileType,
-    recipients, open, createdAt: FieldValue.serverTimestamp(), expiresAt: new Date(now + (open ? 24 : 168) * 3600000).toISOString(),
+    recipients, open, toSelf, createdAt: FieldValue.serverTimestamp(), expiresAt: new Date(now + (open ? 24 : 168) * 3600000).toISOString(),
   });
-  if (recipients.length) {
+  const others = recipients.filter((r) => r !== uid);
+  if (toSelf) await C.pushTo([uid], { title: 'Sent to your devices', body: payload.title || 'Open Flyer to see it.', data: { route: 'drop', id }, category: 'drops' });
+  if (others.length) {
     const label = { card: 'their Connect card', link: 'a link', note: 'a note', photo: 'a photo', file: 'a file', event: 'an event', group: 'a group invite', plan: 'a plan' }[kind];
-    await C.pushTo(recipients, { title: `${me.name.split(' ')[0] || 'Someone'} sent you ${label}`, body: payload.title || 'Open Flyer to see it.', data: { route: 'drop', id }, category: 'drops' });
+    await C.pushTo(others, { title: `${me.name.split(' ')[0] || 'Someone'} sent you ${label}`, body: payload.title || 'Open Flyer to see it.', data: { route: 'drop', id }, category: 'drops' });
   }
   return { ok: true, id, url: `${C.shareBase()}/d/${id}` };
 });

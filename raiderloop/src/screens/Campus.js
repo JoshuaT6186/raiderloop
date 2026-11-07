@@ -13,6 +13,7 @@ import Icon from '../ui/Icon';
 import { AvatarPin } from '../ui/Avatar';
 import { Maps } from '../lib/native';
 import { isOpenNow } from '../lib/hours';
+import { openDirections } from '../lib/links';
 import { metaLine } from '../lib/time';
 import { currentPosition, lastSeenLabel } from '../lib/location';
 import { BOTTOM_SPACE } from '../ui/Page';
@@ -67,7 +68,7 @@ function Tools() {
    deals). The Map | Hub switch sits at the top of both. */
 export default function Campus() {
   const { campusMode, flags } = useApp();
-  if (flags.hub && campusMode === 'hub') return <CampusHub />;
+  if (Platform.OS === 'web' || (flags.hub && campusMode === 'hub')) return <CampusHub />;
   return <CampusMap />;
 }
 
@@ -85,14 +86,18 @@ function PostcardPin({ p, onPress }) {
   );
 }
 
-const LAYERS = [['postcards', 'Postcards', 'image'], ['events', 'Events', 'ticket'], ['deals', 'Deals', 'tag'], ['status', 'Status', 'elevator']];
+const LAYERS = [['postcards', 'Postcards', 'image'], ['events', 'Events', 'ticket'], ['deals', 'Student deals', 'tag'], ['explore', 'Explore Lubbock', 'discover'], ['status', 'Status', 'elevator']];
+const EXPLORE_PURPLE = '#B79CF0';
 
 function CampusMap() {
   const { t } = useTheme();
   const { setSheet, sheet, schoolId, friendLocations = [], flags, postcards = [], myPosts = [], user, isHidden } = useApp();
-  const [layers, setLayers] = useState({ postcards: true, events: true, deals: true, status: true });
+  const [layers, setLayers] = useState({ postcards: true, events: true, deals: true, explore: true, status: true });
   const deals = useCallable(api.getDeals, {}, 'deals', { enabled: !!flags.deals && layers.deals });
   const dealPins = layers.deals ? (deals.data || []).filter((d) => d.lat != null && d.lng != null) : [];
+  const explore = useCallable(api.getExplore, {}, 'places', { enabled: layers.explore });
+  const explorePins = layers.explore ? (explore.data || []).filter((p) => p.lat != null && p.lng != null) : [];
+  const [spot, setSpot] = useState(null);
   const [events, setEvents] = useState([]);
   const [statuses, setStatuses] = useState([]);
   const [viewing, setViewing] = useState(null);
@@ -148,13 +153,18 @@ function CampusMap() {
             </Marker>
           ))}
           {BUS_STOPS.filter((s) => s.lat).map((s) => (
-            <Marker key={s.id} coordinate={{ latitude: s.lat + 0.0002, longitude: s.lng + 0.0002 }} title={`Citibus: ${s.name}`} description={`${s.route} route`} tracksViewChanges={false}>
+            <Marker key={s.id} coordinate={{ latitude: s.lat + 0.0002, longitude: s.lng + 0.0002 }} onPress={() => setSheet({ type: 'bus', id: s.id })} tracksViewChanges={false}>
               <View style={{ backgroundColor: t.postit.blue, borderRadius: 6, borderWidth: 2, borderColor: '#1F2A44', padding: 2 }}><Icon name="bus" size={14} color="#1F2A44" /></View>
             </Marker>
           ))}
           {dealPins.map((d) => (
             <Marker key={`deal-${d.id}`} coordinate={{ latitude: d.lat, longitude: d.lng }} title={d.name} description={d.offer} onCalloutPress={() => setSheet({ type: 'deals' })} tracksViewChanges={false}>
-              <View style={{ backgroundColor: t.postit.green, borderRadius: 6, borderWidth: 2, borderColor: '#1F2A44', padding: 2, transform: [{ rotate: '-6deg' }] }}><Icon name="tag" size={14} color="#1F2A44" /></View>
+              <View style={{ backgroundColor: '#F7A35C', borderRadius: 6, borderWidth: 2, borderColor: '#1F2A44', padding: 2, transform: [{ rotate: '-6deg' }] }}><Icon name="tag" size={14} color="#1F2A44" /></View>
+            </Marker>
+          ))}
+          {explorePins.map((p) => (
+            <Marker key={`ex-${p.id}`} coordinate={{ latitude: p.lat, longitude: p.lng }} onPress={() => setSpot(p)} tracksViewChanges={false}>
+              <View style={{ backgroundColor: EXPLORE_PURPLE, borderRadius: 8, borderWidth: 2, borderColor: '#1F2A44', padding: 2, transform: [{ rotate: '-4deg' }] }}><Icon name="discover" size={14} color="#1F2A44" /></View>
             </Marker>
           ))}
           {eventPins.map((e) => (
@@ -203,6 +213,19 @@ function CampusMap() {
       </SafeAreaView>
 
       {viewing ? <StoryViewer person={viewing} posts={viewing.posts} onClose={() => setViewing(null)} /> : null}
+      {spot ? (
+        <View style={{ position: 'absolute', left: PAD, right: PAD, top: 190 }} pointerEvents="box-none">
+          <PostIt color="lavender" tape tilt={-1}>
+            <PT kind="tiny">Explore Lubbock · {spot.kind}</PT>
+            <PT kind="bold" style={{ marginTop: 2 }}>{spot.name}</PT>
+            <PT kind="small" style={{ marginTop: 2 }}>{spot.why}</PT>
+            <View style={{ flexDirection: 'row', marginTop: 10 }}>
+              <Button title="Directions" icon="walk" small onPress={() => openDirections(spot)} style={{ marginRight: 8 }} />
+              <Button title="Close" small kind="ghost" onPress={() => setSpot(null)} />
+            </View>
+          </PostIt>
+        </View>
+      ) : null}
 
       {/* drawer */}
       <Animated.View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: Animated.add(h, BOTTOM_SPACE - 40), backgroundColor: t.paper, borderTopLeftRadius: 18, borderTopRightRadius: 18, borderTopWidth: 2, borderColor: t.mode === 'dark' ? t.borderStrong : '#1F2A44', paddingHorizontal: PAD, paddingTop: 8 }}>

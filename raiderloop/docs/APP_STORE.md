@@ -24,7 +24,7 @@ PLAN YOUR SEMESTER
 FIND YOUR PEOPLE
 • One Connect card with a QR code (and Apple Wallet)
 • Say hi to people who share a class or club, only if you both opt in
-• Flyer Drop: send a card, link, photo, or PDF to someone next to you
+• Flyer Drop: send a card, link, photo, or PDF to someone next to you, or to your own laptop
 • Group Spaces for every project: deadlines, files, polls, and a "when is everyone free" finder
 • Friends-only photos that disappear after a day, and a Story that's just for you
 
@@ -32,7 +32,9 @@ KNOW YOUR CAMPUS
 • A map with friends' Postcards, events, student deals, and live "elevator out" or "seats full" taps
 • What's open right now, dining, study spots, parking, and Citibus
 • Events and tips from students and confirmed org officers
-• Office hours lines, a missed-class kit, and Safe Walk so friends know you got home
+• A missed-class kit, a room finder, and Safe Walk so friends know you got home
+• Student discounts and Lubbock spots to explore, pinned on the map
+• A Campus Guide for anyone curious about Texas Tech, no account needed
 
 PLAY A LITTLE
 • Flight Score, rubber stamps, campus scavenger hunts, and hide and seek with friends
@@ -72,7 +74,7 @@ Fill in the parts in [brackets] first. Only say it was tested once you've tried 
 > • 5.1.1(iv): the screen shown before the location permission prompt now uses "Continue".
 > • 2.5.4: "location" has been removed from UIBackgroundModes. Flyer uses location only while the app is open.
 >
-> Flyer is an independent, student-built campus app; it does not use any university login. Demo account: [email] / [password] (has friends, a group, and posts to look at). Without an account: "Let's fly" → "Look around first".
+> Flyer is an independent, student-built campus app; it does not use any university login. Demo account: [email] / [password] (has friends, a group, and posts to look at). Without an account: "Let's fly" → "Look around first". Anyone can also open the Campus Guide (book icon on Home, or "Just looking?" on the first screen) without signing up.
 >
 > User-generated content: every photo and post is checked automatically before anyone else sees it, and unsure items are held for human review. Every post, card, Drop, group and person has Report and Block. Our terms (linked in Settings) have a zero-tolerance policy for objectionable content, and we review reports within 24 hours.
 >
@@ -82,7 +84,7 @@ Fill in the parts in [brackets] first. Only say it was tested once you've tried 
 >
 > Extensions: a home and lock screen widget (next class and leave time), and a Messages app (plan polls and sending saved events). Apple Wallet: an optional pass showing the user's Connect card QR.
 >
-> Pilot uses Anthropic's Claude to answer campus questions.
+> Pilot uses Anthropic's Claude to answer campus questions. Flyer also has a web version at https://raiderloop-98046.web.app/app/ that uses the same account.
 
 ## Screenshots to take (6.9" iPhone)
 1. Home timeline with a free gap and "Leave in…"

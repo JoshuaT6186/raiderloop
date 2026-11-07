@@ -10,7 +10,7 @@
  * plus the QR code is how Flyer does it.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Pressable, Image, Share } from 'react-native';
+import { View, Pressable, Image, Share, Platform } from 'react-native';
 import {
   Sheet, T, PostIt, PT, Card, Button, Row, Chip, Field, Loading, Empty,
 } from '../ui/Paper';
@@ -38,14 +38,61 @@ const KINDS = [
 ];
 const KIND_ICON = Object.fromEntries(KINDS.map((k) => [k.id, k.icon]));
 KIND_ICON.plan = 'calendarPlus';
+const WEB = Platform.OS === 'web';
+
+/* Drops sent from THIS device, so a send-to-yourself doesn't fly back
+   in on the same screen it left from. */
+export const sentHere = new Set();
+
+/* Web: drag a file from your desktop onto the Drop box. */
+function useFileDrop(ref, onFile) {
+  const [over, setOver] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!WEB || !el || !el.addEventListener) return undefined;
+    const stop = (e) => { e.preventDefault(); e.stopPropagation(); };
+    const enter = (e) => { stop(e); setOver(true); };
+    const leave = (e) => { stop(e); setOver(false); };
+    const drop = (e) => {
+      stop(e); setOver(false);
+      const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) onFile(f);
+    };
+    el.addEventListener('dragenter', enter); el.addEventListener('dragover', enter);
+    el.addEventListener('dragleave', leave); el.addEventListener('drop', drop);
+    return () => {
+      el.removeEventListener('dragenter', enter); el.removeEventListener('dragover', enter);
+      el.removeEventListener('dragleave', leave); el.removeEventListener('drop', drop);
+    };
+  }, [ref.current]);
+  return over;
+}
 
 /* What you're about to send. */
 function Composer({ kind, setKind, payload, setPayload, file, setFile }) {
   const { t } = useTheme();
   const { savedEvents, groups, showToast } = useApp();
   const pick = async (fn) => { try { const f = await fn(); if (f) setFile(f); } catch (e) { showToast(uploadError(e)); } };
+  const zone = useRef(null);
+  const over = useFileDrop(zone, (f) => {
+    const type = f.type || '';
+    const isPdf = type === 'application/pdf';
+    const isImg = ['image/jpeg', 'image/png', 'image/webp'].includes(type);
+    if (!isPdf && !isImg) { showToast('Drop a photo (JPG, PNG) or a PDF.'); return; }
+    if (f.size > 15 * 1024 * 1024) { showToast('That file is over 15 MB. Try a smaller one.'); return; }
+    setKind(isPdf ? 'file' : 'photo');
+    setFile({ uri: URL.createObjectURL(f), name: f.name, size: f.size, contentType: type });
+    setPayload((p) => ({ ...p, title: p.title || f.name.replace(/\.[a-z0-9]+$/i, '') }));
+  });
   return (
     <View>
+      {WEB ? (
+        <View ref={zone} style={{ borderWidth: 2, borderStyle: 'dashed', borderColor: over ? t.accent : '#1F2A44', backgroundColor: over ? t.postit.blue : t.postit.yellow, borderRadius: 10, paddingVertical: 22, alignItems: 'center', marginBottom: 12 }}>
+          <Icon name="upload" size={26} color="#1F2A44" />
+          <PT kind="bold" style={{ marginTop: 6 }}>{file ? `Ready: ${file.name || 'your file'}` : 'Drag a photo or PDF here'}</PT>
+          <PT kind="small">or pick a kind below. Up to 15 MB.</PT>
+        </View>
+      ) : null}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
         {KINDS.map((k) => <Chip key={k.id} label={k.label} icon={k.icon} active={kind === k.id} onPress={() => { setKind(k.id); setPayload({}); setFile(null); }} />)}
       </View>
@@ -110,6 +157,7 @@ export function DropSheet({ to, onClose, initialTab }) {
   const [nearby, setNearby] = useState([]);
   const [locOk, setLocOk] = useState(null);
   const [picked, setPicked] = useState(to ? [to] : []);
+  const [self, setSelf] = useState(false);
   const [busy, setBusy] = useState(false);
   const [flight, setFlight] = useState(false);
   const [qr, setQr] = useState(null);
@@ -118,7 +166,7 @@ export function DropSheet({ to, onClose, initialTab }) {
 
   /* Stay visible to people nearby only while this sheet is open. */
   useEffect(() => {
-    if (!signedIn) return undefined;
+    if (!signedIn || WEB) return undefined;
     let alive = true;
     const beat = async () => {
       const pos = await currentPosition();
@@ -142,7 +190,8 @@ export function DropSheet({ to, onClose, initialTab }) {
   const send = async () => {
     setBusy(true);
     try {
-      await api.dropSend(await buildArgs({ to: picked }));
+      const r = await api.dropSend(await buildArgs({ to: picked, self }));
+      if (r?.data?.id) sentHere.add(r.data.id);
       setFlight(true);
     } catch (e) { showToast(uploadError(e)); }
     setBusy(false);
@@ -163,11 +212,11 @@ export function DropSheet({ to, onClose, initialTab }) {
   }
 
   return (
-    <Sheet title="Flyer Drop" hand="Hold your phones close. The plane does the rest." onClose={onClose} height={0.94}
+    <Sheet title="Flyer Drop" hand={WEB ? "Send to friends, your phone, or a QR code." : "Hold your phones close. The plane does the rest."} onClose={onClose} height={0.94}
       footer={tab === 'send' && !qr ? (
         <View style={{ flexDirection: 'row' }}>
           <Button title="Show QR" icon="qr" kind="ghost" disabled={!ready(kind, payload, file) || busy} onPress={makeQr} style={{ flex: 1, marginRight: 8 }} />
-          <Button title={picked.length ? `Send to ${picked.length}` : 'Pick someone'} icon="send" loading={busy} disabled={!picked.length || !ready(kind, payload, file)} onPress={send} style={{ flex: 1.2 }} />
+          <Button title={picked.length || self ? `Send${picked.length + (self ? 1 : 0) > 1 ? ` to ${picked.length + (self ? 1 : 0)}` : ''}` : 'Pick someone'} icon="send" loading={busy} disabled={(!picked.length && !self) || !ready(kind, payload, file)} onPress={send} style={{ flex: 1.2 }} />
         </View>
       ) : null}>
       <FolderTabs small value={tab} onChange={setTab} tabs={[{ id: 'send', label: 'Send', icon: 'send', color: 'yellow' }, { id: 'inbox', label: `Received${drops.length ? ` (${drops.length})` : ''}`, icon: 'inbox', color: 'blue' }]} />
@@ -184,8 +233,13 @@ export function DropSheet({ to, onClose, initialTab }) {
         <>
           <T kind="tiny" style={{ marginBottom: 6 }}>Send</T>
           <Composer kind={kind} setKind={setKind} payload={payload} setPayload={setPayload} file={file} setFile={setFile} />
+          <T kind="tiny" style={{ marginTop: 16, marginBottom: 6 }}>My devices</T>
+          <Row title={WEB ? 'Send to my phone' : 'Send to my laptop or other devices'} meta="Shows up in Flyer anywhere you're signed in" left={<Icon name="laptop" color={t.ink} />}
+            right={<Icon name={self ? 'check' : 'plus'} color={self ? t.ok : t.faint} />} onPress={() => setSelf(!self)} />
           <T kind="tiny" style={{ marginTop: 16, marginBottom: 6 }}>Nearby with Flyer Drop open</T>
-          {locOk === false ? (
+          {WEB ? (
+            <Card><T kind="small">Nearby works in the iPhone app, since it uses your location. On the web, send to friends or My devices.</T></Card>
+          ) : locOk === false ? (
             <Card><T kind="small">Nearby needs location while Flyer is open. You can still send to friends, or show a QR.</T></Card>
           ) : nearby.length ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>

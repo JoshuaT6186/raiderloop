@@ -13,13 +13,16 @@ import Icon from './Icon';
 import { PlaneMark } from './Logo';
 import { tap } from '../lib/native';
 import { FadeIn } from './Kit';
+import { useWide } from './web';
 
 export const BOTTOM_SPACE = 150;
 
 /* paper: 'lined' (default) | 'graph' | 'dots' | 'kraft' | 'plain' */
 export function Page({ title, eyebrow, right, children, refreshing, onRefresh, scroll = true, margin = true, paper = 'lined' }) {
   const { t } = useTheme();
+  const wide = useWide();
   const showMargin = margin && paper === 'lined';
+  const column = wide ? { width: '100%', maxWidth: 1040, alignSelf: 'center' } : null;
   const header = (
     <View>
       <SeasonDecor />
@@ -39,7 +42,7 @@ export function Page({ title, eyebrow, right, children, refreshing, onRefresh, s
       <SafeAreaView style={{ flex: 1 }}>
         {scroll ? (
           <ScrollView
-            contentContainerStyle={{ paddingLeft: showMargin ? PAD + 22 : PAD, paddingRight: PAD, paddingTop: Platform.OS === 'android' ? 40 : 12, paddingBottom: BOTTOM_SPACE }}
+            contentContainerStyle={[{ paddingLeft: showMargin ? PAD + 22 : PAD, paddingRight: PAD, paddingTop: Platform.OS === 'android' ? 40 : wide ? 28 : 12, paddingBottom: wide ? 90 : BOTTOM_SPACE }, column]}
             showsVerticalScrollIndicator={false}
             refreshControl={onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={t.accent} /> : undefined}
             keyboardShouldPersistTaps="handled"
@@ -48,7 +51,7 @@ export function Page({ title, eyebrow, right, children, refreshing, onRefresh, s
             <FadeIn>{children}</FadeIn>
           </ScrollView>
         ) : (
-          <View style={{ flex: 1, paddingTop: Platform.OS === 'android' ? 40 : 12 }}>
+          <View style={[{ flex: 1, paddingTop: Platform.OS === 'android' ? 40 : wide ? 28 : 12 }, column]}>
             <View style={{ paddingLeft: showMargin ? PAD + 22 : PAD, paddingRight: PAD }}>{header}</View>
             {children}
           </View>
@@ -107,5 +110,39 @@ export function PilotFab({ onPress }) {
       </Pressable>
       <PlaneOutfit size={26} style={{ top: -10, right: -4, transform: [{ rotate: '18deg' }] }} />
     </Animated.View>
+  );
+}
+
+/* ---------- Web sidebar ----------
+   On wide browser windows the bottom tabs become folder tabs down the
+   left side, plus Flyer Drop, Present, Desk mode and the guide. */
+export function WebSidebar({ tab, setTab, badges = {}, onDrop, onPresent, onDesk, onGuide, onAdmin, admin }) {
+  const { t, f } = useTheme();
+  const Item = ({ icon, label, onPress, active, color, badge }) => (
+    <Pressable onPress={onPress} accessibilityRole={active != null ? 'tab' : 'button'} accessibilityState={active != null ? { selected: active } : undefined} accessibilityLabel={label}
+      style={({ hovered }) => ({ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12, marginBottom: 8, borderRadius: 12, borderTopRightRadius: active ? 0 : 12, borderBottomRightRadius: active ? 0 : 12, marginRight: active ? -2 : 10,
+        borderWidth: active ? 2 : 1.5, borderRightWidth: active ? 0 : 1.5, borderColor: t.mode === 'dark' ? t.borderStrong : '#1F2A44', backgroundColor: active ? t.postit[color] : hovered ? t.card : 'transparent' })}>
+      <Icon name={icon} size={20} color={active ? '#1F2A44' : t.ink} stroke={active ? 2.4 : 2} />
+      <T kind="body" style={{ marginLeft: 10, fontFamily: active ? f.bodyBold : undefined }} color={active ? '#1F2A44' : t.ink}>{label}</T>
+      {badge ? <View style={{ marginLeft: 'auto', width: 8, height: 8, borderRadius: 4, backgroundColor: t.redPen }} /> : null}
+    </Pressable>
+  );
+  return (
+    <View style={{ width: 236, paddingTop: 24, paddingLeft: 14, backgroundColor: t.mode === 'dark' ? t.card : '#F1E9D8', borderRightWidth: 1.5, borderRightColor: t.border }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: 8, marginBottom: 18 }}>
+        <PlaneMark size={34} trail={false} color={t.ink} />
+        <T kind="marker" style={{ fontSize: 30, lineHeight: 36, marginLeft: 8 }}>Flyer</T>
+      </View>
+      {TABS.map((x) => <Item key={x.id} icon={x.icon} label={x.label} color={x.color} active={tab === x.id} badge={badges[x.id]} onPress={() => setTab(x.id)} />)}
+      <View style={{ height: 1.5, backgroundColor: t.border, marginVertical: 12, marginRight: 14 }} />
+      <Item icon="plane" label="Flyer Drop" onPress={onDrop} />
+      <Item icon="tv" label="Present on a screen" onPress={onPresent} />
+      <Item icon="laptop" label="Desk mode" onPress={onDesk} />
+      <Item icon="book" label="Campus Guide" onPress={onGuide} />
+      {admin ? <Item icon="shield" label="Admin" onPress={onAdmin} /> : null}
+      <View style={{ marginTop: 'auto', padding: 12, paddingBottom: 22, paddingRight: 24 }}>
+        <T kind="small" style={{ fontSize: 12 }}>Map, Apple Health, widgets and Wallet are in the iPhone app.</T>
+      </View>
+    </View>
   );
 }

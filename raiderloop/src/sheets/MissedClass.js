@@ -138,7 +138,6 @@ export function MissedClassSheet({ course: initialCourse, date: initialDate, onC
           <Card>
             {group ? <Row title={`Your group: ${group.name}`} meta="Ask what you missed" left={<Icon name="users" color={t.ink} />} onPress={() => setSheet({ type: 'group', id: group.id })} /> : null}
             {syl && syl.officeHours ? <Row title={`Office hours${syl.instructor ? ` · ${syl.instructor}` : ''}`} meta={syl.officeHours} left={<Icon name="clock" color={t.ink} />} /> : null}
-            <Row title="Join an office hours line" meta="If your professor uses a Flyer queue" left={<Icon name="hourglass" color={t.ink} />} onPress={() => setSheet({ type: 'queue' })} />
             <Row title="Email your professor" meta="Opens Mail with a short note to edit" left={<Icon name="message" color={t.ink} />} last
               onPress={() => Linking.openURL(`mailto:?subject=${encodeURIComponent(`${code}: missed class ${pretty(date)}`)}&body=${encodeURIComponent(`Hi Professor,\n\nI missed class on ${pretty(date)}. Is there anything I should catch up on besides the posted material?\n\nThank you,\n`)}`).catch(() => {})} />
           </Card>

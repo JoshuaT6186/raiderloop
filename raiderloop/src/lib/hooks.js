@@ -7,7 +7,7 @@ import { AsyncStorage } from './native';
 /* Reads that are safe to keep a copy of on this phone, so Flyer still
    shows something useful offline (in a basement classroom, on a bad
    signal). Never anything private to other people. */
-const OFFLINE_OK = new Set(['getNews', 'getEvents', 'getDeals', 'getAround', 'getCampusAlerts', 'getSportsSchedule', 'getDegreePlan', 'getMajor', 'getSponsors', 'getVenueImage', 'getPlay', 'getLeaderboard']);
+const OFFLINE_OK = new Set(['getGames', 'getNews', 'getEvents', 'getDeals', 'getAround', 'getCampusAlerts', 'getSportsSchedule', 'getDegreePlan', 'getMajor', 'getSponsors', 'getVenueImage', 'getPlay', 'getLeaderboard']);
 const CACHE_PREFIX = 'flyer.cache.';
 const memCache = {};
 async function readCache(k) {
@@ -59,7 +59,11 @@ export function useCallable(fn, params, key, { asArray = true, enabled = true } 
       .catch(async (e) => {
         fresh = true;
         if (cancelled) return;
-        const msg = e?.code === 'functions/resource-exhausted' ? e.message : (e?.message || 'Failed to load.');
+        /* Never show raw codes like "Firebase: Error (auth/...)" to people. */
+        const raw = String(e?.code || '') + ' ' + String(e?.message || '');
+        const msg = e?.code === 'functions/resource-exhausted' ? e.message
+          : /network|unavailable|offline|internal|deadline|auth\//i.test(raw) ? "Can't reach Flyer right now. Check your connection and try again."
+            : (e?.message || "Couldn't load this. Try again in a minute.");
         const c = cacheKey ? await readCache(cacheKey) : null;
         if (cancelled) return;
         if (c) setState({ data: shape(c.data), loading: false, error: null, offline: true, savedAt: c.at });

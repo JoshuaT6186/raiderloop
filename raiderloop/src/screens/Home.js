@@ -6,7 +6,7 @@
  * new season's icon, game day, finals) show up only then.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Image, Pressable } from 'react-native';
+import { View, Image, Pressable, Platform } from 'react-native';
 import { useApp } from '../state/AppContext';
 import { useTheme } from '../theme/ThemeContext';
 import { Page } from '../ui/Page';
@@ -24,7 +24,8 @@ import { api, listenPublic } from '../lib/firebase';
 import {
   itemsOnDay, todayCode, toMinutes, sortByTime, greeting, dueLabel, daysUntil, metaLine, dateAt, minutesToLabel,
 } from '../lib/time';
-import { buildingById, walkLabel, nextGame, gameDateLabel, DINING } from '../data/campus';
+import { buildingById, walkLabel, gameDateLabel, DINING } from '../data/campus';
+import { useGames } from '../lib/games';
 import { openDirections, openUrl } from '../lib/links';
 import { isOpenNow } from '../lib/hours';
 import { roomLabel } from '../lib/rooms';
@@ -394,8 +395,13 @@ function QuickTools() {
   const tools = [
     { id: 'open', label: 'Open now', icon: 'clock', color: 'green', sheet: { type: 'openNow' } },
     { id: 'rooms', label: 'Find a room', icon: 'door', color: 'blue', sheet: { type: 'rooms' } },
-    { id: 'walk', label: 'Safe Walk', icon: 'shield', color: 'orange', sheet: { type: 'safewalk' } },
-    { id: 'scan', label: 'Scan', icon: 'scan', color: 'pink', sheet: { type: 'scan' } },
+    ...(Platform.OS === 'web' ? [
+      { id: 'drop', label: 'Flyer Drop', icon: 'plane', color: 'orange', sheet: { type: 'drop' } },
+      { id: 'present', label: 'Present', icon: 'tv', color: 'pink', sheet: { type: 'present' } },
+    ] : [
+      { id: 'walk', label: 'Safe Walk', icon: 'shield', color: 'orange', sheet: { type: 'safewalk' } },
+      { id: 'scan', label: 'Scan', icon: 'scan', color: 'pink', sheet: { type: 'scan' } },
+    ]),
   ];
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 18 }}>
@@ -449,7 +455,8 @@ export default function Home() {
   const nowM = now.getHours() * 60 + now.getMinutes();
   const today = sortByTime(itemsOnDay(scheduleItems, todayCode(now)));
   const next = today.find((c) => (toMinutes(c.endTime) ?? toMinutes(c.time)) > nowM) || null;
-  const g = nextGame(now);
+  const games = useGames(now);
+  const g = games.next;
   const gameSoon = g && (new Date(g.kickoff) - now) < 6 * 86400000;
   const finalsIn = daysUntil(TERM.finalsStart, now);
   const first = (userName || '').split(' ')[0];
@@ -461,6 +468,7 @@ export default function Home() {
       right={(
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <ScoreChip />
+          <Pressable onPress={() => setSheet({ type: 'guide' })} accessibilityLabel="Campus Guide" hitSlop={8} style={{ marginRight: 10 }}><Icon name="book" size={24} /></Pressable>
           <Pressable onPress={() => setTab('you')} accessibilityLabel="Your profile"><Avatar config={avatar} size={46} /></Pressable>
         </View>
       )}>
@@ -487,22 +495,15 @@ export default function Home() {
       <NextDeadline now={now} />
       <WellnessPeek now={now} />
 
-      {finalsIn > 0 && finalsIn <= 45 ? (
-        <PostIt color="lavender" seed="finals" style={{ marginTop: 18 }} onPress={() => setTab('schedule')}>
-          <PT kind="tiny">{TERM.label} finals</PT>
-          <PT kind="title" style={{ marginTop: 2 }}>{finalsIn} days until finals start</PT>
-          <PT kind="small">Tap to look up your exam times.</PT>
-        </PostIt>
-      ) : null}
 
       {gameSoon ? (
         <>
           <Section title="Game day" icon="football" />
-          <PostIt color="orange" seed={g.kickoff} tape onPress={() => setSheet({ type: 'gameday', kickoff: g.kickoff })}>
-            <PT kind="tiny">{g.homeAway === 'home' ? 'Home' : 'Away'} · {g.venue}</PT>
+          <PostIt color="orange" seed={g.kickoff} tape onPress={() => setSheet(games.sport === 'Football' ? { type: 'gameday', kickoff: g.kickoff } : { type: 'sports' })}>
+            <PT kind="tiny">{games.sport} · {g.homeAway === 'home' ? 'Home' : g.homeAway === 'neutral' ? 'Neutral site' : 'Away'}{g.venue ? ` · ${g.venue}` : ''}</PT>
             <PT kind="title" style={{ fontSize: 21, marginTop: 2 }}>Texas Tech {g.homeAway === 'home' ? 'vs.' : 'at'} {g.opponent}</PT>
             <PT kind="small">{gameDateLabel(g.kickoff, now)}</PT>
-            {g.homeAway === 'home' ? <PT kind="bold" style={{ marginTop: 8 }}>Going? Share your spot with friends for the game →</PT> : null}
+            {g.homeAway === 'home' && games.sport === 'Football' ? <PT kind="bold" style={{ marginTop: 8 }}>Going? Share your spot with friends for the game →</PT> : null}
           </PostIt>
         </>
       ) : null}

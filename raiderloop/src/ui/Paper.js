@@ -7,6 +7,7 @@
  * used on surfaces and headers only; body text always sits on a flat
  * fill so it stays readable.
  */
+import { isWideNow } from './web';
 import React, { useEffect, useRef } from 'react';
 import {
   View, Text, Pressable, Modal, ScrollView, Animated, Easing, StyleSheet, TextInput,
@@ -345,7 +346,7 @@ export function Sheet({ visible = true, onClose, title, hand, children, height =
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(20,24,36,0.42)' }} onPress={onClose} accessibilityLabel="Close" />
-        <Animated.View style={{ maxHeight: SCREEN_H * height, transform: [{ translateY: y }] }}>
+        <Animated.View style={[{ maxHeight: SCREEN_H * height, transform: [{ translateY: y }] }, isWideNow() ? { width: '100%', maxWidth: 700, alignSelf: 'center' } : null]}>
           <TornEdge color={t.paper} />
           <View style={{ backgroundColor: t.paper, paddingBottom: 30 }}>
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: PAD, paddingTop: 6 }}>

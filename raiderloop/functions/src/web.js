@@ -27,7 +27,7 @@ const WALLET_ON = process.env.WALLET_ENABLED === 'true';
 const TWILIO_ON = process.env.TWILIO_ENABLED === 'true';
 const BUNDLE_ID = 'com.joshuat8808.flyer';
 
-const secrets = [C.ANTHROPIC_API_KEY, C.TAVILY_API_KEY];
+const secrets = [C.ANTHROPIC_API_KEY, C.TAVILY_API_KEY, ...C.backupAISecrets];
 let WALLET = null; let TWILIO_AUTH_TOKEN = null;
 if (WALLET_ON) {
   WALLET = { cert: defineSecret('WALLET_SIGNER_CERT'), key: defineSecret('WALLET_SIGNER_KEY'), pass: defineSecret('WALLET_SIGNER_PASSPHRASE'), wwdr: defineSecret('WALLET_WWDR') };
@@ -309,6 +309,24 @@ function messagesPollPage(req, res) {
   res.set('Cache-Control', 'public, max-age=300').send(page({ title: q, desc: opts.join(' · '), body }));
 }
 
+/* ---------- Website waitlist (flyer site home page) ----------
+   Email only, one entry per address, at most 5 tries per IP a day. */
+async function waitlist(req, res) {
+  res.set('Cache-Control', 'no-store');
+  const email = String((req.body && req.body.email) || '').trim().toLowerCase().slice(0, 160);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return res.status(400).json({ ok: false, error: 'That email doesn\'t look right.' });
+  const ip = String(req.headers['x-forwarded-for'] || req.ip || '').split(',')[0].trim();
+  const day = new Date().toISOString().slice(0, 10);
+  const ipKey = require('crypto').createHash('sha256').update(`${ip}|${day}`).digest('hex').slice(0, 32);
+  const lim = db.doc(`waitlistLimits/${ipKey}`);
+  const snap = await lim.get();
+  if (snap.exists && (snap.data().n || 0) >= 5) return res.status(429).json({ ok: false, error: 'Too many tries today. Try again tomorrow.' });
+  await lim.set({ n: (snap.exists ? snap.data().n || 0 : 0) + 1, day }, { merge: true });
+  const id = require('crypto').createHash('sha256').update(email).digest('hex').slice(0, 40);
+  await db.doc(`waitlist/${id}`).set({ email, source: clean((req.body && req.body.source) || 'site', 40), at: new Date().toISOString() }, { merge: true });
+  return res.json({ ok: true });
+}
+
 exports.web = onRequest({ secrets, memory: '512MiB', timeoutSeconds: 60, maxInstances: 20 }, async (req, res) => {
   try {
     const parts = req.path.split('/').filter(Boolean);
@@ -329,6 +347,7 @@ exports.web = onRequest({ secrets, memory: '512MiB', timeoutSeconds: 60, maxInst
     if (a === 'ext' && b === 'deals') return extDeals(req, res);
     if (a === 'oauth' && b) return oauthBounce(req, res, b);
     if (a === 'm') return messagesPollPage(req, res);
+    if (a === 'api' && b === 'waitlist' && req.method === 'POST') return waitlist(req, res);
     return notFound(res, "That page doesn't exist.");
   } catch (e) {
     console.error('web error', e);

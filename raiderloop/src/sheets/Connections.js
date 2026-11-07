@@ -143,19 +143,26 @@ export function ConnectionsSheet({ pick, onClose }) {
 
       <T kind="tiny" style={{ marginTop: 18, marginBottom: 6 }}>Accounts</T>
       <Card>
-        <Row title="Microsoft (OneDrive + Outlook)" meta={providerReady('microsoft') ? 'Clip OneDrive files into groups; see Outlook events' : 'Coming soon in Flyer'} left={<Icon name="folder" color={t.ink} />}
-          right={providerReady('microsoft') ? <Button title={connections.microsoft ? 'Disconnect' : 'Connect'} small kind={connections.microsoft ? 'ghost' : 'primary'} loading={busy === 'microsoft'} onPress={() => provider('microsoft')} /> : <Status on={false} />} />
-        <Row title="Google Calendar" meta={providerReady('google') ? 'See your Google Calendar events in Flyer' : 'Coming soon in Flyer. A calendar link works today.'} left={<Icon name="calendarPlus" color={t.ink} />}
-          right={providerReady('google') ? <Button title={connections.google ? 'Disconnect' : 'Connect'} small kind={connections.google ? 'ghost' : 'primary'} loading={busy === 'google'} onPress={() => provider('google')} /> : <Status on={false} />} />
-        <Row title="Canva" meta={canvaReady() ? 'Clip your designs into Group Spaces' : 'Coming soon in Flyer. You can paste Canva links today.'} left={<Icon name="palette" color={t.ink} />}
-          right={canvaReady() && signedIn ? <Button title={connections.canva ? 'Disconnect' : 'Connect'} small kind={connections.canva ? 'ghost' : 'primary'} loading={busy === 'canva'} onPress={canva} /> : <Status on={false} />} />
+        {providerReady('microsoft') ? (
+          <Row title="Microsoft (OneDrive + Outlook)" meta="Clip OneDrive files into groups; see Outlook events" left={<Icon name="folder" color={t.ink} />}
+            right={<Button title={connections.microsoft ? 'Disconnect' : 'Connect'} small kind={connections.microsoft ? 'ghost' : 'primary'} loading={busy === 'microsoft'} onPress={() => provider('microsoft')} />} />
+        ) : null}
+        {providerReady('google') ? (
+          <Row title="Google Calendar" meta="See your Google Calendar events in Flyer" left={<Icon name="calendarPlus" color={t.ink} />}
+            right={<Button title={connections.google ? 'Disconnect' : 'Connect'} small kind={connections.google ? 'ghost' : 'primary'} loading={busy === 'google'} onPress={() => provider('google')} />} />
+        ) : null}
+        {canvaReady() && signedIn ? (
+          <Row title="Canva" meta="Clip your designs into Group Spaces" left={<Icon name="palette" color={t.ink} />}
+            right={<Button title={connections.canva ? 'Disconnect' : 'Connect'} small kind={connections.canva ? 'ghost' : 'primary'} loading={busy === 'canva'} onPress={canva} />} />
+        ) : null}
         <Row title="Apple Health" meta={healthAvailable() ? 'Sleep and steps next to your schedule, on this phone only' : 'Not available on this device'} left={<Icon name="heart" color={t.ink} />}
           onPress={() => setSheet({ type: 'wellness' })} right={<Status on={connections.health} />} last />
       </Card>
 
+      {CONNECTORS.textFlyerNumber ? (<>
       <T kind="tiny" style={{ marginTop: 18, marginBottom: 6 }}>Text Flyer</T>
       <Card>
-        {CONNECTORS.textFlyerNumber ? (
+        {(
           connections.textFlyer || smsStep === 'done' ? (
             <>
               <T kind="bold">Text {CONNECTORS.textFlyerNumber} any campus question</T>
@@ -170,8 +177,9 @@ export function ConnectionsSheet({ pick, onClose }) {
               <T kind="small" color={t.pencil} style={{ marginTop: 6 }}>Msg and data rates may apply. Your schedule summary is shared with Pilot only while this is on.</T>
             </>
           ) : <T kind="small">Make an account to link a phone number.</T>
-        ) : <T kind="small">Coming soon: text Flyer a campus question and Pilot texts back.</T>}
+        )}
       </Card>
+      </>) : null}
 
       <Divider />
       <Pressable onPress={() => setAdvanced(!advanced)} style={{ flexDirection: 'row', alignItems: 'center' }} accessibilityRole="button">

@@ -7,7 +7,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, StatusBar, Linking, AppState } from 'react-native';
 import { useApp } from './state/AppContext';
 import { useTheme } from './theme/ThemeContext';
-import { TabBar, PilotFab } from './ui/Page';
+import { TabBar, PilotFab, WebSidebar } from './ui/Page';
+import { useWide, IS_WEB } from './ui/web';
+import { DeskMode } from './sheets/Desk';
 import { Toast, Sheet, Button, PostIt, PT } from './ui/Paper';
 import { PlaneFlight, FadeIn } from './ui/Kit';
 import Avatar from './ui/Avatar';
@@ -21,7 +23,7 @@ import { RequestSchool } from './screens/onboarding/School';
 import Pilot from './sheets/Pilot';
 import FriendsSheet from './sheets/Friends';
 import { EventSheet, OrgSheet, BuildingSheet, DiningSheet } from './sheets/Details';
-import { OpenNowSheet, ParkingSheet, SafetySheet } from './sheets/CampusTools';
+import { OpenNowSheet, ParkingSheet, SafetySheet, BusSheet } from './sheets/CampusTools';
 import { GamedaySheet, PlusSheet, AccountSheet } from './sheets/Misc';
 import {
   JobsSheet, MoneySheet, FormsSheet, HealthSheet, CourseSheet, DealsSheet,
@@ -29,17 +31,16 @@ import {
 import { ToolsSheet } from './sheets/Tools';
 import { CardEditSheet, CardViewSheet, MyQRSheet } from './sheets/Connect';
 import { ScannerSheet } from './sheets/Scanner';
-import { DropSheet, DropViewSheet } from './sheets/Drop';
+import { DropSheet, DropViewSheet, sentHere } from './sheets/Drop';
 import { SayHiSheet, useSayHiSync } from './sheets/SayHi';
 import { StorySheet, ComposeSheet } from './sheets/Story';
 import { GroupsSheet, GroupNewSheet, GroupSheet } from './sheets/Groups';
 import { PlanNewSheet, PlanSheet } from './sheets/Plans';
 import { PrivacySheet } from './sheets/Privacy';
 import { RoomFinderSheet } from './sheets/Rooms';
-import { FlyerScanSheet, SyllabusSheet } from './sheets/Scan';
+import { SyllabusSheet } from './sheets/Scan';
 import { PublicNewSheet, PublicPostSheet } from './sheets/Public';
 import { ShareViewSheet } from './sheets/ShareView';
-import { QueueSheet } from './sheets/OfficeHours';
 import { PresentSheet } from './sheets/Present';
 import { MissedClassSheet } from './sheets/MissedClass';
 import { SafeWalkSheet, WalkWatchSheet } from './sheets/SafeWalk';
@@ -50,6 +51,7 @@ import { FirstWeeksSheet } from './sheets/FirstWeeks';
 import { ScrapbookSheet } from './sheets/Scrapbook';
 import { ConnectionsSheet } from './sheets/Connections';
 import { AdminSheet } from './sheets/Admin';
+import { CampusGuideSheet } from './sheets/Guide';
 import { OrgsSheet } from './sheets/Orgs';
 import { useNotificationScheduler } from './lib/notifications';
 import { useWidgetSync } from './lib/widget';
@@ -74,6 +76,7 @@ function SheetHost() {
     case 'dining': return <DiningSheet id={s.id} onClose={close} />;
     case 'openNow': return <OpenNowSheet onClose={close} />;
     case 'parking': return <ParkingSheet onClose={close} />;
+    case 'bus': return <BusSheet id={s.id} onClose={close} />;
     case 'safety': return <SafetySheet onClose={close} />;
     case 'sports': return <SportsSheet onClose={close} />;
     case 'friends': return <FriendsSheet initialTab={s.tab} onClose={close} />;
@@ -105,14 +108,12 @@ function SheetHost() {
     case 'group': return <GroupSheet id={s.id} code={s.code} onClose={close} />;
     case 'planNew': return <PlanNewSheet groupId={s.groupId} title={s.title} options={s.options} kind={s.kind} onClose={close} />;
     case 'plan': return <PlanSheet id={s.id} onClose={close} />;
-    case 'queue': return <QueueSheet code={s.code} host={s.host} onClose={close} />;
     case 'present': return <PresentSheet code={s.code} groupId={s.groupId} onClose={close} />;
     case 'safewalk': return <SafeWalkSheet onClose={close} />;
     case 'walkWatch': return <WalkWatchSheet id={s.id} onClose={close} />;
     /* Discover */
     case 'publicNew': return <PublicNewSheet kind={s.kind} draft={s.draft} onClose={close} />;
     case 'publicPost': return <PublicPostSheet id={s.id} onClose={close} />;
-    case 'scanFlyer': return <FlyerScanSheet onClose={close} />;
     case 'orgOfficer': return <OrgsSheet orgId={s.orgId} onClose={close} />;
     /* Play */
     case 'game': return <GameSheet id={s.id} onClose={close} />;
@@ -128,6 +129,7 @@ function SheetHost() {
     case 'scrapbook': return <ScrapbookSheet onClose={close} />;
     case 'connections': return <ConnectionsSheet pick={s.pick} onClose={close} />;
     case 'admin': return <AdminSheet onClose={close} />;
+    case 'guide': return <CampusGuideSheet onClose={close} />;
     default: return null;
   }
 }
@@ -163,7 +165,7 @@ function IncomingDrop() {
     if (!user) return;
     const ids = drops.map((d) => d.id);
     if (seen.current === null) { seen.current = new Set(ids); return; } // first load: nothing flies in
-    const fresh = drops.find((d) => !seen.current.has(d.id) && d.from !== user.uid);
+    const fresh = drops.find((d) => !seen.current.has(d.id) && !sentHere.has(d.id) && (d.from !== user.uid || d.toSelf));
     ids.forEach((id) => seen.current.add(id));
     if (fresh && !incoming) { setIncoming(fresh); setLanded(false); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -182,7 +184,7 @@ function IncomingDrop() {
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Avatar config={incoming.fromAvatar} size={40} />
             <View style={{ flex: 1, marginLeft: 10 }}>
-              <PT kind="bold">{incoming.fromName || 'Someone'} sent you {DROP_LABEL[incoming.kind] || 'something'}</PT>
+              <PT kind="bold">{incoming.toSelf && incoming.from === user?.uid ? `You sent yourself ${DROP_LABEL[incoming.kind] || 'something'}` : `${incoming.fromName || 'Someone'} sent you ${DROP_LABEL[incoming.kind] || 'something'}`}</PT>
               {incoming.payload?.title ? <PT kind="small" numberOfLines={1}>{incoming.payload.title}</PT> : null}
             </View>
           </View>
@@ -259,31 +261,58 @@ function BackgroundJobs() {
   return null;
 }
 
+/* Admin check for the web sidebar (staff accounts only). */
+function useAdmin(user) {
+  const [admin, setAdmin] = useState(false);
+  useEffect(() => { if (IS_WEB && user && !user.isAnonymous) api.amIAdmin({}).then((r) => setAdmin(!!r.data.admin)).catch(() => {}); }, [user?.uid]);
+  return admin;
+}
+
 export default function Shell() {
   const { t } = useTheme();
-  const { hydrated, onboarded, tab, setTab, pilotOpen, setPilotOpen, toast, requests, assignments, intros, groupInvites } = useApp();
+  const { hydrated, onboarded, tab, setTab, pilotOpen, setPilotOpen, toast, requests, assignments, intros, groupInvites, setSheet, user, campusMode, setCampusMode } = useApp();
+  const wide = useWide();
+  const admin = useAdmin(user);
+  const [desk, setDesk] = useState(false);
+  /* The web has no map, so Campus opens on the Hub. */
+  useEffect(() => { if (IS_WEB && campusMode !== 'hub') setCampusMode('hub'); }, [campusMode]);
   if (!hydrated) return <View style={{ flex: 1, backgroundColor: t.paper }} />;
   if (!onboarded) {
     return (
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, backgroundColor: wide ? (t.mode === 'dark' ? t.card : '#F1E9D8') : t.paper }}>
         <StatusBar barStyle={t.mode === 'dark' ? 'light-content' : 'dark-content'} />
-        <Onboarding />
+        <View style={wide ? { flex: 1, width: '100%', maxWidth: 560, alignSelf: 'center', borderLeftWidth: 1.5, borderRightWidth: 1.5, borderColor: t.border } : { flex: 1 }}>
+          <Onboarding />
+        </View>
       </View>
     );
   }
   const overdue = assignments.some((a) => !a.done && a.due && new Date(a.due) < new Date());
   const youBadge = requests.length > 0 || (intros || []).length > 0 || (groupInvites || []).length > 0;
-  return (
-    <View style={{ flex: 1, backgroundColor: t.paper }}>
-      <StatusBar barStyle={t.mode === 'dark' ? 'light-content' : 'dark-content'} />
-      <BackgroundJobs />
+  const screens = (
+    <>
       {tab === 'home' ? <Home /> : null}
       {tab === 'discover' ? <Discover /> : null}
       {tab === 'campus' ? <Campus /> : null}
       {tab === 'schedule' ? <Planner /> : null}
       {tab === 'you' ? <You /> : null}
+    </>
+  );
+  return (
+    <View style={{ flex: 1, backgroundColor: t.paper }}>
+      <StatusBar barStyle={t.mode === 'dark' ? 'light-content' : 'dark-content'} />
+      <BackgroundJobs />
+      {wide ? (
+        <View style={{ flex: 1, flexDirection: 'row' }}>
+          <WebSidebar tab={tab} setTab={setTab} badges={{ you: youBadge, schedule: overdue }} admin={admin}
+            onDrop={() => setSheet({ type: 'drop' })} onPresent={() => setSheet({ type: 'present' })} onDesk={() => setDesk(true)}
+            onGuide={() => setSheet({ type: 'guide' })} onAdmin={() => setSheet({ type: 'admin' })} />
+          <View style={{ flex: 1 }}>{screens}</View>
+        </View>
+      ) : screens}
       <PilotFab onPress={() => setPilotOpen(true)} />
-      <TabBar tab={tab} setTab={setTab} badges={{ you: youBadge, schedule: overdue }} />
+      {wide ? null : <TabBar tab={tab} setTab={setTab} badges={{ you: youBadge, schedule: overdue }} />}
+      {desk ? <DeskMode onClose={() => setDesk(false)} /> : null}
       <SheetHost />
       <ConflictPrompt />
       {pilotOpen ? <Pilot onClose={() => setPilotOpen(false)} /> : null}

@@ -17,7 +17,7 @@
  *    location from the server.
  */
 import { useEffect, useRef } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { Location } from './native';
 import { api } from './firebase';
 import { distanceM } from '../data/campus';
@@ -33,6 +33,7 @@ export async function getForegroundPermission(ask = true) {
 }
 
 export async function currentPosition() {
+  if (Platform.OS === 'web') return null; // the web version never uses location
   if (!Location || !(await getForegroundPermission(false))) return null;
   const p = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }).catch(() => null);
   return p ? { lat: p.coords.latitude, lng: p.coords.longitude } : null;

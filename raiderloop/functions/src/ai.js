@@ -4,6 +4,7 @@
  * per person and capped globally per day.
  */
 const { onCall } = require('firebase-functions/v2/https');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 const C = require('./common');
 
 const { db, HttpsError, ANTHROPIC_API_KEY, TAVILY_API_KEY, HOUR } = C;
@@ -53,33 +54,51 @@ const lookup = async (request) => {
   await C.takeQuota(uid, 'lookups', LIMITS.lookups);
 };
 
-exports.getEvents = onCall(C.callOpts(BOTH), async (request) => {
-  await lookup(request);
-  const { value, cached } = await C.cachedList('events', 3 * HOUR, 1 * HOUR, async () => {
-    const results = await C.tavilySearch({ query: 'Texas Tech University campus events this week Lubbock', includeImages: true, maxResults: 8 });
-    const images = (results.images || []).slice(0, 8);
-    const text = await C.claudeText({
-      system: `Extract real, distinct upcoming campus events from this search text about Texas Tech University. Return ONLY a JSON array. Each:
+/* Each event or story gets the picture from ITS OWN page (the page's
+   og:image), never a random search photo. No picture → the app shows
+   a paper card instead. */
+async function pageImage(url) {
+  if (!url || !/^https?:\/\//.test(url)) return null;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 4000);
+  try {
+    const r = await fetch(url, { signal: ctrl.signal, redirect: 'follow', headers: { 'user-agent': 'FlyerBot/1.0 (campus app link preview)' } });
+    if (!r.ok || !(r.headers.get('content-type') || '').includes('html')) return null;
+    const html = (await r.text()).slice(0, 200000);
+    const m = html.match(/<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)(?::secure_url)?["'][^>]+content=["']([^"']+)["']/i)
+      || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["'](?:og:image|twitter:image)["']/i);
+    if (!m) return null;
+    const img = new URL(m[1].replace(/&amp;/g, '&'), url).toString();
+    return /^https:\/\//.test(img) ? img : null;
+  } catch (e) {
+    return null;
+  } finally { clearTimeout(timer); }
+}
+async function withImages(list, urlKey, imgKey) {
+  const out = await Promise.all(list.map(async (x) => ({ ...x, [imgKey]: await pageImage(x[urlKey]) })));
+  return out;
+}
+
+async function computeEvents() {
+  const results = await C.tavilySearch({ query: 'Texas Tech University campus events this week Lubbock', maxResults: 8, depth: 'basic' });
+  const text = await C.claudeText({
+    system: `Extract real, distinct upcoming campus events from this search text about Texas Tech University. Return ONLY a JSON array. Each:
 { "title": string, "org": string, "date": string (as stated, e.g. "Today", "Oct 9"), "time": string (e.g. "7:00 PM" or ""), "endTime": string, "location": string, "desc": string (one sentence, your own words), "sourceUrl": string, "startsAt": ISO 8601 with -05:00 offset if date AND time are known, else "" }
 Only include events with a real stated date. If none qualify, return [].
 ${C.recencyGuard()}
 
 SEARCH RESULTS:
 ${C.resultsText(results)}`,
-      messages: [{ role: 'user', content: 'Extract the events as JSON.' }], maxTokens: 1600,
-    });
-    return C.parseJsonArray(text).map((e, i) => ({ ...e, id: `ev-${(e.title || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 24)}-${(e.date || '').replace(/\W/g, '')}`, img: images[i % (images.length || 1)] || null }));
+    messages: [{ role: 'user', content: 'Extract the events as JSON.' }], maxTokens: 1600,
   });
-  return { events: value, cached };
-});
+  const list = C.parseJsonArray(text).map((e) => ({ ...e, id: `ev-${(e.title || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 24)}-${(e.date || '').replace(/\W/g, '')}` }));
+  return withImages(list, 'sourceUrl', 'img');
+}
 
-exports.getNews = onCall(C.callOpts(BOTH), async (request) => {
-  await lookup(request);
-  const { value, cached } = await C.cachedList('news', 3 * HOUR, 1 * HOUR, async () => {
-    const results = await C.tavilySearch({ query: 'Texas Tech Daily Toreador Lubbock news today', includeImages: true, maxResults: 8 });
-    const images = (results.images || []).slice(0, 8);
-    const text = await C.claudeText({
-      system: `Extract real, distinct news headlines about Texas Tech and Lubbock. Return ONLY a JSON array. Each:
+async function computeNews() {
+  const results = await C.tavilySearch({ query: 'Texas Tech Daily Toreador Lubbock news today', maxResults: 8, depth: 'basic' });
+  const text = await C.claudeText({
+    system: `Extract real, distinct news headlines about Texas Tech and Lubbock. Return ONLY a JSON array. Each:
 { "headline": string, "source": string (real outlet name — never invent), "official": boolean (true only for "The Daily Toreador"), "byline": string|null, "date": string, "excerpt": string (one sentence, your own words), "url": string }
 Only real stories with a real source and date. If none, return [].
 ${C.recencyGuard()}
@@ -87,11 +106,41 @@ For news: a story from a previous year is not current. Recent stories (last few 
 
 SEARCH RESULTS:
 ${C.resultsText(results)}`,
-      messages: [{ role: 'user', content: 'Extract the headlines as JSON.' }], maxTokens: 1600,
-    });
-    return C.parseJsonArray(text).map((n, i) => ({ ...n, art: images[i % (images.length || 1)] || null }));
+    messages: [{ role: 'user', content: 'Extract the headlines as JSON.' }], maxTokens: 1600,
   });
+  return withImages(C.parseJsonArray(text), 'url', 'art');
+}
+
+/* Fast first load: answer from the last good copy (up to 2 days old)
+   right away, while warmFeeds keeps that copy fresh every 2 hours.
+   Only a brand-new project with no copy at all waits for a search. */
+async function feed(key, compute) {
+  const fresh = await C.getCached(key, 3 * HOUR);
+  if (fresh && fresh.length) return { value: fresh, cached: true };
+  const stale = await C.getCached(key, 48 * HOUR);
+  if (stale && stale.length) return { value: stale, cached: true, stale: true };
+  return C.cachedList(key, 3 * HOUR, 1 * HOUR, compute);
+}
+
+exports.getEvents = onCall(C.callOpts(BOTH), async (request) => {
+  await lookup(request);
+  const { value, cached } = await feed('events_v2', computeEvents);
+  return { events: value, cached };
+});
+
+exports.getNews = onCall(C.callOpts(BOTH), async (request) => {
+  await lookup(request);
+  const { value, cached } = await feed('news_v2', computeNews);
   return { news: value, cached };
+});
+
+exports.warmFeeds = onSchedule({ schedule: 'every 2 hours', secrets: [...BOTH, ...C.backupAISecrets], timeoutSeconds: 300, memory: '512MiB' }, async () => {
+  for (const [key, compute] of [['events_v2', computeEvents], ['news_v2', computeNews]]) {
+    try {
+      const v = await compute();
+      if (v && v.length) await C.setCached(key, v);
+    } catch (e) { console.error('warmFeeds', key, e.message); }
+  }
 });
 
 exports.getSportsSchedule = onCall(C.callOpts(BOTH), async (request) => {
@@ -227,7 +276,7 @@ exports.getParking = onCall(C.callOpts(BOTH), async (request) => {
   if (hit) return { ...hit, cached: true };
   const d = new Date();
   const mmdd = `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
-  const results = await C.tavilySearch({ query: `Texas Tech Transportation Parking Services "Parking Lot Availability" ${mmdd}`, maxResults: 6, depth: 'advanced' });
+  const results = await C.tavilySearch({ query: `Texas Tech Transportation Parking Services "Parking Lot Availability" ${mmdd}`, maxResults: 5, depth: 'basic' });
   const text = await C.claudeText({
     system: `From these search results, find Texas Tech Transportation & Parking Services' commuter "Parking Lot Availability" update posted TODAY (${mmdd}). Use only the most recent update from today.
 Return ONLY { "postedAt": string (e.g. "2:00 p.m."), "lots": [ { "lot": "C1", "percentFull": number } ] }.

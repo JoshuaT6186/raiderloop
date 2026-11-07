@@ -5,7 +5,7 @@
  * Your phone becomes the remote.
  */
 import React, { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { View, Platform } from 'react-native';
 import {
   Sheet, T, PostIt, PT, Card, Button, Row, Field, Loading,
 } from '../ui/Paper';
@@ -51,20 +51,20 @@ export function PresentSheet({ code: initialCode, groupId, onClose }) {
   const nav = (d) => api.presentNav({ code: claimed, index: (item?.index || 0) + d }).catch(() => {});
   const end = async () => { await api.presentEnd({ code: claimed }).catch(() => {}); onClose(); };
   return (
-    <Sheet title="Present" hand={claimed ? `Connected to screen ${claimed}` : 'Your phone is the remote.'} onClose={onClose} height={0.94}
+    <Sheet title="Present" hand={claimed ? `Connected to screen ${claimed}` : Platform.OS === 'web' ? 'This window is the remote.' : 'Your phone is the remote.'} onClose={onClose} height={0.94}
       footer={claimed ? <Button title="Stop presenting" kind="danger" onPress={end} /> : null}>
       {!claimed ? (
         <>
           <PostIt color="yellow" tape tilt={-0.8}>
             <PT kind="bold">On the TV or class PC, open:</PT>
             <PT kind="title" style={{ marginTop: 4 }}>{SHARE.base.replace(/^https:\/\//, '')}{SHARE.presentPath}</PT>
-            <PT kind="small" style={{ marginTop: 4 }}>It shows a 6-letter code. Type it below or scan the QR on the screen.</PT>
+            <PT kind="small" style={{ marginTop: 4 }}>{Platform.OS === 'web' ? 'It shows a 6-letter code. Type it below.' : 'It shows a 6-letter code. Type it below or scan the QR on the screen.'}</PT>
           </PostIt>
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: 16 }}>
             <Field placeholder="TV code" value={code} onChangeText={(v) => setCode(v.toUpperCase())} autoCapitalize="characters" maxLength={8} style={{ flex: 1, marginRight: 8 }} />
             <Button title="Connect" small loading={busy} disabled={code.trim().length < 6} onPress={() => claim(code.trim())} style={{ marginTop: 2 }} />
           </View>
-          <Button title="Scan the screen's QR" icon="scan" kind="ghost" small onPress={() => setScan(true)} style={{ alignSelf: 'flex-start' }} />
+          {Platform.OS === 'web' ? null : <Button title="Scan the screen's QR" icon="scan" kind="ghost" small onPress={() => setScan(true)} style={{ alignSelf: 'flex-start' }} />}
         </>
       ) : (
         <>

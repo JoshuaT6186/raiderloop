@@ -21,7 +21,10 @@ import { LIMITS, PURCHASES } from '../config';
 export function GamedaySheet({ kickoff, onClose }) {
   const { t } = useTheme();
   const { friends, sharing, set, showToast, user, setSheet } = useApp();
-  const g = FOOTBALL_SCHEDULE.find((x) => x.kickoff === kickoff);
+  /* The live feed and the built-in schedule may write the same kickoff
+     differently, so match within 12 hours of each other. */
+  const g = FOOTBALL_SCHEDULE.find((x) => x.kickoff === kickoff)
+    || FOOTBALL_SCHEDULE.find((x) => Math.abs(Date.parse(x.kickoff) - Date.parse(kickoff)) < 12 * 3600000);
   const [picked, setPicked] = useState(() => sharing.allowed.length ? sharing.allowed : friends.map((f) => f.uid));
   if (!g) return null;
   const home = g.homeAway === 'home';

@@ -91,7 +91,7 @@ function Result({ r, onPickBuilding }) {
   return (
     <View>
       <PostIt color="green" tape tilt={-0.6}>
-        <PT kind="tiny">{r.how === 'code' ? 'Building code' : r.how === 'yours' ? 'You taught Flyer this one' : 'Best match'}</PT>
+        <PT kind="tiny">{r.how === 'picked' ? 'Building' : r.how === 'code' ? 'Building code' : r.how === 'yours' ? 'You taught Flyer this one' : 'Best match'}</PT>
         <PT kind="title" style={{ fontSize: 22 }}>{b.name}</PT>
         <PT kind="small">{[walkLabel(b), r.room ? `Room ${r.room}` : null].filter(Boolean).join(' · ')}</PT>
         {r.floor != null ? <PT kind="bold" style={{ marginTop: 8 }}>Probably {floorLabel(r.floor).toLowerCase()}. Most rooms here start with their floor number.</PT> : null}
@@ -115,31 +115,65 @@ function Result({ r, onPickBuilding }) {
   );
 }
 
+/* Two simple boxes: the building (type part of its name and pick it),
+   and the room number. Your classes are one tap away. Typing the room
+   the way the schedule writes it ("HOLDEN 104") still works too. */
 export function RoomFinderSheet({ query: initialQuery, buildingId, onClose }) {
   const { t } = useTheme();
   const { scheduleItems, roomAliases, set, showToast } = useApp();
-  const [q, setQ] = useState(initialQuery || (buildingId ? (buildingById(buildingId)?.name || '') : ''));
+  const start = initialQuery ? findRoom(initialQuery, roomAliases) : null;
+  const [bText, setBText] = useState(start?.building?.name || (buildingId ? (buildingById(buildingId)?.name || '') : (start?.buildingText || '')));
+  const [picked, setPicked] = useState(start?.building || (buildingId ? buildingById(buildingId) : null));
+  const [room, setRoom] = useState(start?.room || '');
   const [picking, setPicking] = useState(false);
   const [bq, setBq] = useState('');
-  const r = useMemo(() => (q.trim().length > 1 ? findRoom(q, roomAliases) : null), [q, roomAliases]);
+  const typed = bText.trim().toLowerCase();
+  const suggestions = useMemo(() => {
+    if (picked || typed.length < 2) return [];
+    const words = typed.split(/\s+/);
+    return BUILDINGS.filter((b) => {
+      const name = b.name.toLowerCase();
+      const short = (b.short || '').toLowerCase();
+      return words.every((w) => name.split(/[^a-z0-9]+/).some((n) => n.startsWith(w))) || short === typed;
+    }).slice(0, 6);
+  }, [typed, picked]);
+  /* If they typed a whole "HOLDEN 104" into the building box, read it. */
+  const r = useMemo(() => {
+    if (picked) {
+      const f = room.trim() ? findRoom(`${picked.name} ${room.trim()}`, roomAliases) : null;
+      return { query: `${picked.name} ${room}`.trim(), code: '', buildingText: picked.name, building: picked, confidence: 1, how: 'picked', room: f ? f.room : '', floor: f ? f.floor : null, floorText: f ? f.floorText : '' };
+    }
+    if (typed.length > 1 && /\d/.test(typed)) return findRoom(bText, roomAliases);
+    return null;
+  }, [picked, room, typed, bText, roomAliases]);
   const places = [...new Map(scheduleItems.filter((c) => !c.oneOff && c.place).map((c) => [c.place, c])).values()];
+  const fromClass = (c) => {
+    const f = findRoom(c.place, roomAliases);
+    setPicked(f.building || null); setBText(f.building ? f.building.name : f.buildingText); setRoom(f.room || '');
+  };
   const teach = (b) => {
     if (r && r.code) set((p) => ({ roomAliases: { ...p.roomAliases, [r.code]: b.id } }));
     showToast(r && r.code ? `Got it: ${r.code} is ${b.name}` : b.name);
-    if (!r || !r.code) setQ(b.name);
+    setPicked(b); setBText(b.name); if (r && r.room) setRoom(r.room);
     setPicking(false);
   };
   const hits = BUILDINGS.filter((b) => b.name.toLowerCase().includes(bq.trim().toLowerCase())).slice(0, 30);
   return (
-    <Sheet title="Find a room" hand="Type it the way your schedule shows it." onClose={onClose} height={0.95}>
-      <Field placeholder="HOLDEN 104, MATH 012, Holden Hall 104…" value={q} onChangeText={setQ} autoCapitalize="characters" autoCorrect={false} returnKeyType="search" clearButtonMode="while-editing" />
+    <Sheet title="Find a room" hand="Type the building, then the room number." onClose={onClose} height={0.95}>
+      <Field label="Building" placeholder="Holden, Math, Science…" value={bText} onChangeText={(v) => { setBText(v); setPicked(null); }} autoCorrect={false} returnKeyType="next" clearButtonMode="while-editing" />
+      {suggestions.length ? (
+        <Card style={{ marginTop: -4, marginBottom: 10 }}>
+          {suggestions.map((b, i) => <Row key={b.id} title={b.name} meta={walkLabel(b)} left={<Icon name="building" color={t.ink} />} onPress={() => { setPicked(b); setBText(b.name); }} last={i === suggestions.length - 1} />)}
+        </Card>
+      ) : null}
+      <Field label="Room number" placeholder="104" value={room} onChangeText={setRoom} autoCapitalize="characters" autoCorrect={false} keyboardType="default" returnKeyType="search" />
       {!r ? (
         places.length ? (
           <Card>
             <T kind="tiny" style={{ marginBottom: 4 }}>Your classes</T>
-            {places.map((c, i) => <Row key={c.id} title={c.place} meta={c.title} left={<Icon name="door" color={t.ink} />} onPress={() => setQ(c.place)} last={i === places.length - 1} />)}
+            {places.map((c, i) => <Row key={c.id} title={c.place} meta={c.title} left={<Icon name="door" color={t.ink} />} onPress={() => fromClass(c)} last={i === places.length - 1} />)}
           </Card>
-        ) : <Empty icon="door" title="Where's your class?" body="Add your classes in the Planner and they'll show up here." />
+        ) : <Empty icon="door" title="Where's your class?" body="Type the building and room above, or add your classes in the Planner and they'll show up here." />
       ) : <Result r={r} onPickBuilding={() => setPicking(true)} />}
       {picking ? (
         <Sheet title="Which building?" hand={r?.code ? `Flyer will remember ${r.code} on this phone.` : ''} onClose={() => setPicking(false)} height={0.85}>

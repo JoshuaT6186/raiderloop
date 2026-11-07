@@ -130,7 +130,7 @@ export function BuildingSheet({ id, onClose }) {
         {plan ? <Row title={plan.label} meta="Official public floor maps" left={<Icon name="layers" color={t.ink} />} onPress={() => openUrl(plan.url)} /> : null}
         {dining.map((d) => <Row key={d.id} title={d.name} meta="Dining inside" left={<Icon name="food" color={t.ink} />} onPress={() => setSheet({ type: 'dining', id: d.id })} />)}
         {resources.map((r) => <Row key={r.id} title={r.name} meta={r.kind} left={<Icon name="help" color={t.ink} />} onPress={r.url ? () => openUrl(r.url) : undefined} />)}
-        {stops.map((s) => <Row key={s.id} title={`Citibus stop: ${s.name}`} meta={`${s.route} route`} left={<Icon name="bus" color={t.ink} />} />)}
+        {stops.map((s) => <Row key={s.id} title={`Citibus stop: ${s.name}`} meta={`${s.route} route · tap for routes and live tracking`} left={<Icon name="bus" color={t.ink} />} onPress={() => setSheet({ type: 'bus', id: s.id })} chevron />)}
       </View>
       <T kind="tiny" style={{ marginTop: 16, marginBottom: 6 }}>Right now</T>
       <StatusTaps placeId={b.id} kinds={['elevator', 'printer', 'seats', 'wifi']} />

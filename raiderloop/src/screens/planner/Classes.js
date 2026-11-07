@@ -125,7 +125,6 @@ export default function Classes() {
       <ScanSchedule compact onConfirm={(items) => { items.forEach((i) => addClass(i)); showToast(`Added ${items.length} classes`); }} />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 10 }}>
         <Button title="Drop in a syllabus" icon="upload" kind="ghost" small onPress={() => setSheet({ type: 'syllabus' })} style={{ marginRight: 8, marginBottom: 8 }} />
-        <Button title="Office hours line" icon="hourglass" kind="ghost" small onPress={() => setSheet({ type: 'queue' })} style={{ marginRight: 8, marginBottom: 8 }} />
         <Button title="Connect a calendar" icon="link" kind="ghost" small onPress={() => setSheet({ type: 'connections' })} style={{ marginBottom: 8 }} />
       </View>
       <Button title="Export week to my calendar" icon="calendarPlus" kind="ghost" small loading={exporting} onPress={doExport} style={{ marginTop: 10 }} />

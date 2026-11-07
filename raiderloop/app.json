@@ -66,7 +66,14 @@
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single",
+      "name": "Flyer",
+      "shortName": "Flyer",
+      "themeColor": "#FBF7EC",
+      "backgroundColor": "#FBF7EC",
+      "description": "Your campus, folded into one app."
     },
     "plugins": [
       "./plugins/withMessagesIcons",
@@ -212,6 +219,9 @@
         "projectId": "8a52ed3c-5954-4d35-8517-0468c1454e94"
       }
     },
-    "owner": "joshuat8808"
+    "owner": "joshuat8808",
+    "experiments": {
+      "baseUrl": "/app"
+    }
   }
 }

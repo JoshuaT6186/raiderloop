@@ -288,7 +288,7 @@ function Settings() {
           <>
             <Divider />
             <T kind="tiny" style={{ marginBottom: 4 }}>Notifications from people</T>
-            {[['social', 'Say hi, friends, and Story', 'hand'], ['drops', 'Flyer Drops', 'plane'], ['groups', 'Group updates', 'users'], ['plans', 'Plans and polls', 'calendarPlus'], ['queue', 'Office hours line', 'hourglass'], ['play', 'Games and hunts', 'gamepad']].map(([k, label, ic], i, arr) => (
+            {[['social', 'Say hi, friends, and Story', 'hand'], ['drops', 'Flyer Drops', 'plane'], ['groups', 'Group updates', 'users'], ['plans', 'Plans and polls', 'calendarPlus'], ['play', 'Games and hunts', 'gamepad']].map(([k, label, ic], i, arr) => (
               <Row key={k} title={label} left={<Icon name={ic} color={t.ink} />} right={<Toggle value={pushPrefs?.[k] !== false} onChange={async (v) => { if (v) await ensureNotificationPermission(true); setP({ [k]: v }); }} label={label} />} last={i === arr.length - 1} />
             ))}
             <T kind="small" style={{ marginTop: 4 }}>Safe Walk alerts always come through.</T>

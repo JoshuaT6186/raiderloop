@@ -4,7 +4,7 @@
  * Official actions always open the real TTU site; Flyer is the front
  * door and the organizer, never a copy of the form.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Pressable, Linking, Alert } from 'react-native';
 import {
   Sheet, T, PostIt, PT, Card, Button, Row, Chip, Field, Stamp, Loading, Empty, Divider, Highlight,
@@ -111,7 +111,6 @@ function JobsFind() {
       <T kind="tiny" style={{ marginTop: 20, marginBottom: 6 }}>Get help</T>
       <Card>
         <LinkRow item={{ ...JOB_HELP.careerCenter, note: 'Resume reviews, mock interviews' }} icon="cap" />
-        <LinkRow item={JOB_HELP.successHub} icon="calendarPlus" />
         <Row title={JOB_HELP.workStudy.name} meta={metaLine(JOB_HELP.workStudy.note, JOB_HELP.workStudy.email)} left={<Icon name="help" size={18} color={t.inkSoft} />}
           right={<Pressable onPress={() => call(JOB_HELP.workStudy.phone)} hitSlop={10} accessibilityLabel="Call Financial Aid about work-study"><Icon name="phone" size={18} color={t.accent} /></Pressable>}
           onPress={() => openUrl(`mailto:${JOB_HELP.workStudy.email}`)} last />
@@ -508,6 +507,15 @@ export function DealsSheet({ onClose }) {
   const live = useCallable(api.getDeals, {}, 'deals');
   const [cat, setCat] = useState('All');
   const deals = live.data || [];
+  /* Deals are found by Flyer, not added by students. If the list is
+     empty (a brand-new install), ask the server to go look once. */
+  const [looking, setLooking] = useState(false);
+  useEffect(() => {
+    if (live.loading || deals.length || looking) return;
+    setLooking(true);
+    api.dealsKickoff({}).then((r) => { if (r?.data?.saved) live.reload(); }).catch(() => {}).finally(() => setLooking(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live.loading, deals.length]);
   const cats = ['All', ...new Set(deals.map((d) => d.category).filter(Boolean))];
   const list = cat === 'All' ? deals : deals.filter((d) => d.category === cat);
   return (
@@ -515,9 +523,8 @@ export function DealsSheet({ onClose }) {
       {live.loading ? <Loading label="Pinning up deals…" /> : null}
       {cats.length > 2 ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 6 }}>{cats.map((c) => <Chip key={c} label={c} active={cat === c} onPress={() => setCat(c)} />)}</View> : null}
       <View style={{ paddingTop: 8 }}>{list.map((d) => <DealCard key={d.id} d={d} />)}</View>
-      {!live.loading && !deals.length ? <Empty icon="tag" title="No deals pinned up yet" body="We only list deals we've checked. Help us find the first ones:" /> : null}
-      <SuggestDeal />
-      <T kind="small" style={{ marginTop: 12, fontSize: 11.5 }}>Deals change. If one didn't work, tap Changed so we can re-check it.</T>
+      {!live.loading && !deals.length ? (looking ? <Loading label="Looking for Lubbock places with student discounts…" /> : <Empty icon="tag" title="No deals found yet" body="Flyer looks every week for Lubbock places that advertise a student discount. Check back soon." />) : null}
+      <T kind="small" style={{ marginTop: 12, fontSize: 11.5 }}>Flyer finds these from each place's own posts and listings, and links the source. Deals change, so ask at the register. If one didn't work, tap Changed so we re-check it.</T>
     </Sheet>
   );
 }

@@ -27,9 +27,31 @@ const ENFORCE_APP_CHECK = process.env.ENFORCE_APP_CHECK === 'true';
 const MODEL = 'claude-sonnet-4-6';
 const HOUR = 3600000;
 
-const callOpts = (secrets = []) => ({
-  secrets, cors: true, enforceAppCheck: ENFORCE_APP_CHECK, maxInstances: 20, timeoutSeconds: 60,
-});
+/* ---------- Backup AI (free tiers or your own server) ----------
+   Claude stays the main AI. Set these in functions/.env to add a
+   backup that takes over when Claude is down, out of budget, or the
+   daily cap is hit (and to run everything on a free tier if you want):
+     AI_FALLBACK=gemini        Google Gemini free tier (key from aistudio.google.com)
+     AI_FALLBACK=openai        any OpenAI-style server: Groq, OpenRouter, or your own
+     AI_PRIMARY=gemini         optional: try the backup FIRST, Claude second
+   Keys go in Secret Manager, never in .env:
+     firebase functions:secrets:set GEMINI_API_KEY
+     firebase functions:secrets:set OPENAI_COMPAT_KEY
+   For "openai" also set OPENAI_COMPAT_URL and OPENAI_COMPAT_MODEL. */
+const AI_FALLBACK = (process.env.AI_FALLBACK || '').toLowerCase();
+const AI_PRIMARY = (process.env.AI_PRIMARY || 'claude').toLowerCase();
+const usesAI = (name) => AI_FALLBACK === name || AI_PRIMARY === name;
+const GEMINI_API_KEY = usesAI('gemini') ? defineSecret('GEMINI_API_KEY') : null;
+const OPENAI_COMPAT_KEY = usesAI('openai') ? defineSecret('OPENAI_COMPAT_KEY') : null;
+
+const callOpts = (secrets = []) => {
+  const list = [...secrets];
+  if (list.includes(ANTHROPIC_API_KEY)) {
+    if (GEMINI_API_KEY) list.push(GEMINI_API_KEY);
+    if (OPENAI_COMPAT_KEY) list.push(OPENAI_COMPAT_KEY);
+  }
+  return { secrets: list, cors: true, enforceAppCheck: ENFORCE_APP_CHECK, maxInstances: 20, timeoutSeconds: 60 };
+};
 
 function requireAuth(request, { account = false } = {}) {
   const a = request.auth;
@@ -70,7 +92,7 @@ async function spend(n = 1) {
   await ref.set({ calls: FieldValue.increment(n) }, { merge: true });
 }
 
-async function callClaude({ system, messages, maxTokens, tools }) {
+async function callClaudeRaw({ system, messages, maxTokens, tools }) {
   await spend();
   const body = { model: MODEL, max_tokens: maxTokens, system, messages };
   if (tools) body.tools = tools;
@@ -84,6 +106,89 @@ async function callClaude({ system, messages, maxTokens, tools }) {
     throw new HttpsError('internal', 'The assistant is unavailable right now.');
   }
   return resp.json();
+}
+
+/* Claude-style messages → other providers. Images and PDFs are passed
+   through where the provider supports them. */
+const partsOf = (content) => (typeof content === 'string' ? [{ type: 'text', text: content }] : (content || []));
+function toGemini(messages) {
+  return messages.map((m) => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: partsOf(m.content).map((p) => {
+      if (p.type === 'text') return { text: p.text };
+      if ((p.type === 'image' || p.type === 'document') && p.source && p.source.type === 'base64') return { inline_data: { mime_type: p.source.media_type, data: p.source.data } };
+      return { text: '' };
+    }),
+  }));
+}
+async function callGemini({ system, messages, maxTokens }) {
+  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-goog-api-key': GEMINI_API_KEY.value() },
+    body: JSON.stringify({
+      systemInstruction: system ? { parts: [{ text: String(system) }] } : undefined,
+      contents: toGemini(messages),
+      generationConfig: { maxOutputTokens: maxTokens || 1024 },
+    }),
+  });
+  if (!resp.ok) {
+    console.error('Gemini error', resp.status, await resp.text());
+    throw new HttpsError('internal', 'The assistant is unavailable right now.');
+  }
+  const j = await resp.json();
+  const text = ((j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || []).map((x) => x.text || '').join('');
+  return { content: [{ type: 'text', text }] };
+}
+async function callOpenAICompat({ system, messages, maxTokens }) {
+  const url = process.env.OPENAI_COMPAT_URL;
+  const model = process.env.OPENAI_COMPAT_MODEL;
+  if (!url || !model) throw new HttpsError('failed-precondition', 'Backup AI is not set up.');
+  const msgs = [];
+  if (system) msgs.push({ role: 'system', content: String(system) });
+  messages.forEach((m) => {
+    const parts = partsOf(m.content).map((p) => {
+      if (p.type === 'text') return { type: 'text', text: p.text };
+      if (p.type === 'image' && p.source && p.source.type === 'base64') return { type: 'image_url', image_url: { url: `data:${p.source.media_type};base64,${p.source.data}` } };
+      throw new HttpsError('failed-precondition', 'Backup AI cannot read this file type.');
+    });
+    msgs.push({ role: m.role === 'assistant' ? 'assistant' : 'user', content: parts.every((p) => p.type === 'text') ? parts.map((p) => p.text).join('\n') : parts });
+  });
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', Authorization: `Bearer ${OPENAI_COMPAT_KEY.value()}` },
+    body: JSON.stringify({ model, messages: msgs, max_tokens: maxTokens || 1024 }),
+  });
+  if (!resp.ok) {
+    console.error('Backup AI error', resp.status, await resp.text());
+    throw new HttpsError('internal', 'The assistant is unavailable right now.');
+  }
+  const j = await resp.json();
+  const text = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
+  return { content: [{ type: 'text', text: typeof text === 'string' ? text : '' }] };
+}
+
+/* Tries the AI providers in order. Calls that use Claude tools (web
+   search, structured tools) stay on Claude only. */
+async function callClaude(args) {
+  const backups = [];
+  if (GEMINI_API_KEY) backups.push('gemini');
+  if (OPENAI_COMPAT_KEY) backups.push('openai');
+  let order = ['claude', ...backups];
+  if (AI_PRIMARY !== 'claude' && backups.includes(AI_PRIMARY)) order = [AI_PRIMARY, 'claude', ...backups.filter((b) => b !== AI_PRIMARY)];
+  if (args.tools) order = ['claude'];
+  let last = null;
+  for (const p of order) {
+    try {
+      if (p === 'claude') return await callClaudeRaw(args);
+      if (p === 'gemini') return await callGemini(args);
+      if (p === 'openai') return await callOpenAICompat(args);
+    } catch (e) {
+      last = e;
+      console.error(`AI provider ${p} failed`, e && e.message);
+    }
+  }
+  throw last || new HttpsError('internal', 'The assistant is unavailable right now.');
 }
 async function claudeText(args) {
   const data = await callClaude(args);
@@ -389,7 +494,7 @@ function shareBase() {
 
 module.exports = {
   makeFriends, removeFanout, shareBase,
-  db, FieldValue, HttpsError, ANTHROPIC_API_KEY, TAVILY_API_KEY, HOUR, callOpts, requireAuth, takeQuota, isPlus,
+  db, FieldValue, HttpsError, ANTHROPIC_API_KEY, TAVILY_API_KEY, HOUR, callOpts, backupAISecrets: [GEMINI_API_KEY, OPENAI_COMPAT_KEY].filter(Boolean), requireAuth, takeQuota, isPlus,
   callClaude, claudeText, tavilySearch, tavilyExtract, getCached, setCached, cachedList, parseJsonArray, parseJsonObject,
   recencyGuard, resultsText, today,
   clean, cleanUrl, shortId, appConfig, isAdmin, seasonId, basicCard, firstAndInitial, friendIds, areFriends, isBlocked, blockedSet,

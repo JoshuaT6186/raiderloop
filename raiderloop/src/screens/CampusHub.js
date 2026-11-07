@@ -5,7 +5,7 @@
  * next few deadlines.
  */
 import React, { useMemo, useState } from 'react';
-import { View, Pressable, Text } from 'react-native';
+import { View, Pressable, Text, Platform } from 'react-native';
 import { useApp } from '../state/AppContext';
 import { useTheme } from '../theme/ThemeContext';
 import { Page } from '../ui/Page';
@@ -43,10 +43,10 @@ export function ModeSwitch() {
 const SECTIONS = [
   /* School */
   { id: 'courses', group: 'school', flag: 'courses', title: 'Classes', sub: 'Catalog lookup, study rooms', icon: 'book', tape: 'dots', color: '#C9B6F2', sheet: { type: 'course' } },
+  { id: 'guide', group: 'school', title: 'Campus Guide', sub: 'TTU facts, traditions, Lubbock', icon: 'book', tape: 'stripes', color: '#F2CD6E', sheet: { type: 'guide' } },
   { id: 'majors', group: 'school', title: 'Major Explorer', sub: 'What each major is really like', icon: 'cap', tape: 'grid', color: '#9DBFEA', sheet: { type: 'majors' } },
   { id: 'roadmap', group: 'school', title: 'Roadmap', sub: 'Your degree, semester by semester', icon: 'route', tape: 'stripes', color: '#F2CD6E', sheet: { type: 'roadmap' } },
   { id: 'missed', group: 'school', title: 'Missed class', sub: "Catch up on what you missed", icon: 'clipboard', tape: 'dots', color: '#F4A9B8', sheet: { type: 'missed' } },
-  { id: 'queue', group: 'school', title: 'Office hours', sub: 'Get in line without standing in the hall', icon: 'hourglass', tape: 'grid', color: '#9FDCC0', sheet: { type: 'queue' } },
   { id: 'syllabus', group: 'school', title: 'Syllabus drop', sub: 'Every date into your Planner', icon: 'upload', tape: 'stripes', color: '#E8A15C', sheet: { type: 'syllabus' } },
   /* Getting around */
   { id: 'rooms', group: 'around', title: 'Find a room', sub: 'Floor, doors, elevator status', icon: 'door', tape: 'dots', color: '#9DBFEA', sheet: { type: 'rooms' } },
@@ -104,12 +104,15 @@ export default function CampusHub() {
   const { setSheet, askPilot, flags } = useApp();
   const [q, setQ] = useState('');
   const results = useMemo(() => searchHelp(q), [q]);
-  const sections = SECTIONS.filter((s) => flags[s.flag] !== false);
+  /* Phone-only tools (Apple Health, Safe Walk's live location) are left
+     off the web version. */
+  const WEB_HIDE = ['wellness', 'safewalk'];
+  const sections = SECTIONS.filter((s) => flags[s.flag] !== false && !(Platform.OS === 'web' && WEB_HIDE.includes(s.id)));
   const searching = q.trim().length > 1;
   const crisis = HEALTH.crisis[0];
 
   return (
-    <Page eyebrow="everything in one place" title="Campus" right={<ModeSwitch />} paper="graph">
+    <Page eyebrow="everything in one place" title="Campus" right={Platform.OS === 'web' ? null : <ModeSwitch />} paper="graph">
       <Field placeholder="How do I…?" value={q} onChangeText={setQ} style={{ marginTop: 12, marginBottom: 8 }} returnKeyType="search" clearButtonMode="while-editing" autoCorrect={false} />
 
       {searching ? (

@@ -49,10 +49,35 @@ export const db = getFirestore(app);
 const functions = getFunctions(app);
 const storage = getStorage(app);
 
+/* On launch, Firebase takes a moment to restore the saved login from
+   the phone. Anything that runs before that finishes must WAIT for it,
+   or it would see "nobody signed in", make a fresh guest, and replace
+   the real account (the old "it keeps signing me out" bug). */
+let restoring = null;
+export function authReady() {
+  if (!restoring) {
+    restoring = (async () => {
+      try {
+        if (typeof auth.authStateReady === 'function') { await auth.authStateReady(); return; }
+      } catch (e) { /* fall through to the listener */ }
+      await new Promise((resolve) => {
+        const off = onAuthStateChanged(auth, () => { off(); resolve(); });
+        setTimeout(resolve, 4000);
+      });
+    })();
+  }
+  return restoring;
+}
+export async function ensureUser() {
+  await authReady();
+  if (!auth.currentUser) await signInAnonymously(auth);
+  return auth.currentUser;
+}
+
 const call = (name) => {
   const fn = httpsCallable(functions, name, { timeout: 120000 });
   const wrapped = async (data) => {
-    if (!auth.currentUser) await signInAnonymously(auth);
+    await ensureUser();
     return fn(data);
   };
   wrapped.callableName = name; // lets useCallable keep an offline copy
@@ -84,6 +109,8 @@ const NAMES = [
   // Tools
   'scanFlyer', 'parseSyllabus', 'getDegreePlan', 'getMajor', 'getAround', 'canvaExchange', 'canvaDesigns', 'canvaDisconnect',
   'smsStart', 'smsConfirm', 'smsDisconnect', 'saveSmsContext',
+  // Sports + places
+  'getGames', 'getExplore', 'dealsKickoff',
 ];
 export const api = Object.fromEntries(NAMES.map((n) => [n, call(n)]));
 
@@ -103,7 +130,7 @@ const rid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(
 /** Uploads a local file (photo or PDF) to uploads/{uid}/… and returns
     the storage path a function will check and publish. */
 export async function uploadLocalFile(uri, contentType = 'image/jpeg') {
-  if (!auth.currentUser) await signInAnonymously(auth);
+  await ensureUser();
   const uid = auth.currentUser.uid;
   const ext = contentType === 'application/pdf' ? 'pdf' : contentType === 'image/png' ? 'png' : 'jpg';
   const path = `uploads/${uid}/${rid()}.${ext}`;
@@ -115,7 +142,7 @@ export async function uploadLocalFile(uri, contentType = 'image/jpeg') {
 
 /* ---------- auth helpers ---------- */
 export const onAuth = (cb) => onAuthStateChanged(auth, cb);
-export const guestSignIn = () => signInAnonymously(auth);
+export const guestSignIn = async () => { await authReady(); return auth.currentUser || (await signInAnonymously(auth)).user; };
 
 /* If someone started as a guest, creating an account LINKS to the
    same uid so their friends and settings carry over. */
@@ -145,7 +172,7 @@ export function appleErrorMessage(e) {
   if (c.includes('account-exists-with-different-credential')) return 'That email already has a Flyer account. Sign in with email instead.';
   if (c.includes('ERR_REQUEST_NOT_HANDLED') || c.includes('ERR_REQUEST_NOT_INTERACTIVE') || c.includes('ERR_REQUEST_UNKNOWN')) return 'Apple sign-in was interrupted. Try again, or use email.';
   if (c.includes('ERR_INVALID_RESPONSE') || c.includes('no-token')) return "Apple didn't send back a sign-in. Try again, or use email.";
-  return 'Apple sign-in didn\'t work this time. Try again, or use email.';
+  return `Apple sign-in didn't work this time. Try again, or use email.${c ? ` (${c})` : ''}`;
 }
 
 /* Sign in with Apple → Firebase. The nonce dance is required:

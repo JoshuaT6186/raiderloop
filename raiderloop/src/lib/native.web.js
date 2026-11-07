@@ -1,12 +1,10 @@
 /**
- * Web build of the native-module loader.
- * ------------------------------------------------------------
- * Metro picks this file instead of native.js when bundling for the
- * browser, so native-only packages (maps, ads, purchases, widget,
- * notifications, calendar, Apple sign-in) are never pulled into the
- * web bundle. The web preview is for looking at the design; those
- * features show their normal "not available in this build" state.
- * Phones use native.js and get everything.
+ * Optional native modules, web edition.
+ * Metro uses this file instead of native.js when building for the
+ * browser, so phone-only packages (maps, Health, ads, purchases,
+ * widgets, Wallet, camera, location, Keychain) are never bundled for
+ * the web at all. Every feature that needs one of them already shows
+ * a friendly "not on the web" state when it gets null here.
  */
 function tryRequire(fn) {
   try { return fn(); } catch (e) { return null; }
@@ -15,11 +13,9 @@ function tryRequire(fn) {
 export const SvgLib = tryRequire(() => require('react-native-svg'));
 export const Maps = null;
 export const ImagePicker = tryRequire(() => require('expo-image-picker'));
-export const DocumentPicker = tryRequire(() => require('expo-document-picker'));
-export const FileSystem = null;
 export const Notifications = null;
 export const AsyncStorage = tryRequire(() => require('@react-native-async-storage/async-storage').default);
-export const Location = tryRequire(() => require('expo-location'));
+export const Location = null;
 export const Calendar = null;
 export const Haptics = null;
 export const AuthSession = tryRequire(() => require('expo-auth-session'));
@@ -35,9 +31,13 @@ export const Tracking = null;
 export const Purchases = null;
 export const AppleTargets = null;
 export const Camera = null;
-export const TaskManager = null;
-export const QRCode = tryRequire(() => require('react-native-qrcode-svg').default);
-export const Constants = tryRequire(() => require('expo-constants').default);
+export const DocumentPicker = tryRequire(() => require('expo-document-picker'));
 export const ImageManipulator = tryRequire(() => require('expo-image-manipulator'));
+export const SecureStore = null;
+export const KeepAwake = tryRequire(() => require('expo-keep-awake'));
+export const Constants = tryRequire(() => require('expo-constants').default);
+export const AltIcons = null;
+export const HealthKit = null;
+export const Clipboard = tryRequire(() => require('expo-clipboard'));
 
-export function tap() {}
+export function tap() { /* no haptics in a browser */ }
